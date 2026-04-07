@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { callClaude } from '@/lib/ai';
 import { evaluateRequestSchema } from '@jd-suite/types';
 
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {

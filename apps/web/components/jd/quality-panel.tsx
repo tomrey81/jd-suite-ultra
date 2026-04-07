@@ -179,7 +179,7 @@ export function QualityPanel() {
 
               <div className="flex-1 overflow-y-auto">
                 {EVAL_CATEGORIES.map((cat) => {
-                  const items = cr.filter((c) => cat.ids.includes(c.id)).sort((a, b) => a.id - b.id);
+                  const items = cr.filter((c) => (cat.ids as readonly number[]).includes(c.id)).sort((a, b) => a.id - b.id);
                   return (
                     <div key={cat.name}>
                       <div

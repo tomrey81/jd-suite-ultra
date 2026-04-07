@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { callClaude, JD_SYSTEM_PROMPT } from '@/lib/ai';
 import { honestReviewRequestSchema } from '@jd-suite/types';
 
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {

@@ -11,9 +11,7 @@ declare module 'next-auth' {
     orgId?: string;
     orgRole?: 'ADMIN' | 'OWNER' | 'MEMBER';
   }
-}
 
-declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
     orgId?: string;
