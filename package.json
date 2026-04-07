@@ -1,0 +1,36 @@
+{
+  "name": "jd-suite",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm --filter web typecheck",
+    "test": "pnpm --filter web test",
+    "test:e2e": "pnpm --filter web test:e2e",
+    "db:generate": "pnpm --filter @jd-suite/db generate",
+    "db:push": "pnpm --filter @jd-suite/db push",
+    "db:migrate:dev": "pnpm --filter @jd-suite/db migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @jd-suite/db migrate:deploy",
+    "db:seed": "pnpm --filter @jd-suite/db seed",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.4.0",
+    "prettier-plugin-tailwindcss": "^0.6.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
+  }
+}

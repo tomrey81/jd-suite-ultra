@@ -1,0 +1,13 @@
+{
+  "buildCommand": "pnpm --filter @jd-suite/db generate && pnpm --filter web build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "outputDirectory": "apps/web/.next",
+  "regions": ["cdg1"],
+  "functions": {
+    "apps/web/app/api/ai/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
+}
