@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   // Upsert — each JD can only be in one slot (unique constraint on jdId)
   const slot = await db.jobArchitectureSlot.upsert({
     where: { jdId },
-    create: { orgId, familyId, jdId, level, note, placedBy: session.user.id },
+    create: { orgId: orgId!, familyId, jdId, level, note, placedBy: session.user.id },
     update: { familyId, level, note, placedBy: session.user.id, placedAt: new Date() },
   });
 
