@@ -42,7 +42,13 @@ export async function POST(req: Request) {
 
   const count = await db.jobFamily.count({ where: { orgId } });
   const family = await db.jobFamily.create({
-    data: { orgId, ...parsed.data, color: parsed.data.color ?? '#8A7560', sortOrder: count },
+    data: {
+      orgId: orgId!,
+      name: parsed.data.name,
+      description: parsed.data.description,
+      color: parsed.data.color ?? '#8A7560',
+      sortOrder: count,
+    },
   });
 
   return NextResponse.json({ family }, { status: 201 });
