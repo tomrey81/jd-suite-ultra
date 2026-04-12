@@ -219,7 +219,7 @@ export default async function PrintPage({
   const data = (jd.data as Record<string, string>) || {};
   const evalResult = jd.evalResults[0];
   const criteria: CriterionResult[] = evalResult
-    ? ((evalResult.criteria as CriterionResult[]) ?? [])
+    ? ((evalResult.criteria as unknown as CriterionResult[]) ?? [])
     : [];
 
   const dims = criteria.length > 0 ? mapDimensions(criteria) : [];
