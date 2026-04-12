@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 import { z } from 'zod';
 
@@ -16,10 +16,10 @@ const updateJDSchema = z.object({
 
 // GET /api/jd/[id]
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   const { id } = await params;
 
   const jd = await db.jobDescription.findFirst({
@@ -49,10 +49,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 // PATCH /api/jd/[id]
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   const { id } = await params;
 
   // Verify ownership
@@ -86,7 +86,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       await tx.jDVersion.create({
         data: {
           jdId: id,
-          authorId: session.user.id,
+          authorId: session!.user.id,
           authorType: 'USER',
           changeType,
           fieldChanged: updates.fieldChanged || (updates.status ? 'status' : undefined),
@@ -108,10 +108,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 // DELETE /api/jd/[id]
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   const { id } = await params;
 
   const existing = await db.jobDescription.findFirst({ where: { id, orgId } });

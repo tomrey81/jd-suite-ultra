@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install",
-  "buildCommand": "DATABASE_URL=${DATABASE_URL:-postgresql://placeholder:placeholder@localhost:5432/placeholder} pnpm --filter @jd-suite/db generate && pnpm --filter web build",
+  "buildCommand": "pnpm --filter @jd-suite/db generate && pnpm --filter web build",
   "outputDirectory": "apps/web/.next",
   "framework": "nextjs",
   "regions": ["cdg1"]

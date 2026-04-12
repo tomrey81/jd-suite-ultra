@@ -5,7 +5,6 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@jd-suite/db', '@jd-suite/types'],
-  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
   async headers() {
     return [
       {

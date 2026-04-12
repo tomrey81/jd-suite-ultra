@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/get-session';
 import { callClaude, JD_SYSTEM_PROMPT } from '@/lib/ai';
 import { generateFieldRequestSchema } from '@jd-suite/types';
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

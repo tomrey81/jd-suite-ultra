@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 import { z } from 'zod';
 
@@ -13,10 +13,10 @@ const createJDSchema = z.object({
 
 // GET /api/jd — list JDs for the user's org
 export async function GET() {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   if (!orgId) return NextResponse.json({ error: 'No organisation' }, { status: 403 });
 
   const jds = await db.jobDescription.findMany({
@@ -34,10 +34,10 @@ export async function GET() {
 
 // POST /api/jd — create a new JD
 export async function POST(req: Request) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   if (!orgId) return NextResponse.json({ error: 'No organisation' }, { status: 403 });
 
   try {
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       const created = await tx.jobDescription.create({
         data: {
           orgId,
-          ownerId: session.user.id,
+          ownerId: session!.user.id,
           templateId: templateId || undefined,
           data,
           jobTitle,
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       await tx.jDVersion.create({
         data: {
           jdId: created.id,
-          authorId: session.user.id,
+          authorId: session!.user.id,
           authorType: 'USER',
           changeType: 'IMPORT',
           note: 'JD created',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 import { createCommentSchema } from '@jd-suite/types';
 
@@ -15,16 +15,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     // Check if authenticated user
-    const session = await auth();
+    const session = await getSession();
     let authorId: string | null = null;
     let authorType = 'USER';
     let authorEmail: string | null = null;
 
     if (session?.user) {
-      const orgId = (session as any).orgId;
+      const orgId = session?.orgId;
       const jd = await db.jobDescription.findFirst({ where: { id, orgId } });
       if (!jd) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      authorId = session.user.id;
+      authorId = session!.user.id;
     } else if (body.guestToken) {
       // Guest access via token
       const token = await db.guestToken.findFirst({
@@ -86,10 +86,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 // GET /api/jd/[id]/comment — list comments
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = await auth();
+  const session = await getSession();
 
   if (session?.user) {
-    const orgId = (session as any).orgId;
+    const orgId = session?.orgId;
     const jd = await db.jobDescription.findFirst({ where: { id, orgId } });
     if (!jd) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   } else {

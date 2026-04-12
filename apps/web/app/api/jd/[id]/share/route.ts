@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 import { createGuestTokenSchema } from '@jd-suite/types';
 
 // POST /api/jd/[id]/share — create a guest review token
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   const { id } = await params;
 
   const jd = await db.jobDescription.findFirst({ where: { id, orgId } });
@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       const guestToken = await tx.guestToken.create({
         data: {
           jdId: id,
-          createdById: session.user.id,
+          createdById: session!.user.id,
           email,
           role,
           expiresAt: new Date(Date.now() + expiryHours * 60 * 60 * 1000),
@@ -38,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       await tx.jDVersion.create({
         data: {
           jdId: id,
-          authorId: session.user.id,
+          authorId: session!.user.id,
           authorType: 'USER',
           changeType: 'FIELD_EDIT',
           note: `Shared with ${email} as ${role} (expires in ${expiryHours}h)`,
@@ -61,10 +61,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 // GET /api/jd/[id]/share — list active tokens
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   const { id } = await params;
 
   const jd = await db.jobDescription.findFirst({ where: { id, orgId } });

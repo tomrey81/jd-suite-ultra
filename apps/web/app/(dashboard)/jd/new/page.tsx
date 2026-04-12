@@ -1,17 +1,16 @@
-import { auth } from '@/lib/auth';
 import { db } from '@jd-suite/db';
 import { redirect } from 'next/navigation';
 import { DEFAULT_TEMPLATE_SECTIONS, DEFAULT_TEMPLATE } from '@/lib/default-template';
 import { buildJDEmpty } from '@/lib/jd-helpers';
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewJDPage() {
-  const session = await auth();
-  if (!session?.user) redirect('/login');
+  // TEMPORARY BYPASS — use first org and user
+  const firstOrg = await db.organisation.findFirst();
+  const firstUser = await db.user.findFirst();
+  if (!firstOrg || !firstUser) redirect('/');
 
-  const orgId = (session as any).orgId;
-  if (!orgId) redirect('/');
-
-  // Ensure the default template exists
   let template = await db.template.findFirst({
     where: { isDefault: true, orgId: null },
   });
@@ -32,12 +31,11 @@ export default async function NewJDPage() {
   const sections = (template.sections as any[]) || DEFAULT_TEMPLATE_SECTIONS;
   const emptyJd = buildJDEmpty(sections);
 
-  // Create the JD in the database
   const jd = await db.$transaction(async (tx) => {
     const created = await tx.jobDescription.create({
       data: {
-        orgId,
-        ownerId: session.user.id,
+        orgId: firstOrg.id,
+        ownerId: firstUser.id,
         templateId: template!.id,
         data: emptyJd,
         jobTitle: '',
@@ -48,7 +46,7 @@ export default async function NewJDPage() {
     await tx.jDVersion.create({
       data: {
         jdId: created.id,
-        authorId: session.user.id,
+        authorId: firstUser.id,
         authorType: 'USER',
         changeType: 'IMPORT',
         note: 'JD created from template',

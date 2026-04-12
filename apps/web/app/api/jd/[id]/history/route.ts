@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 
 // GET /api/jd/[id]/history — audit trail
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
+  const session = await getSession();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const orgId = (session as any).orgId;
+  const orgId = session?.orgId;
   const { id } = await params;
 
   const jd = await db.jobDescription.findFirst({ where: { id, orgId } });

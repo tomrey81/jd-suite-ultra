@@ -11,6 +11,26 @@ const STATUS_COLORS = {
   insufficient: { text: 'text-danger', bg: 'bg-danger-bg', label: 'Gap' },
 } as const;
 
+// Maps each 16-criteria ID to the JD section that addresses it
+const CRITERIA_TO_SECTION: Record<number, string> = {
+  1: 'C',   // Knowledge & Experience → Knowledge, Qualifications & Experience
+  2: 'E',   // Finding Solutions → Problem Complexity & Planning
+  3: 'E',   // Planning & Organisation → Problem Complexity & Planning
+  4: 'F',   // Communication & Inclusion → Communication & Stakeholder Engagement
+  5: 'G',   // Practical Skills → Tools, Systems & Digital Skills
+  6: 'G',   // Physical Effort → Tools (physicalSkills field)
+  7: 'E',   // Mental Effort → Problem Complexity & Planning
+  8: 'I',   // Emotional Effort → Working Conditions & Environment
+  9: 'E',   // Initiative & Independence → Problem Complexity & Planning
+  10: 'H',  // Welfare of People → Responsibility - People, Budget & Impact
+  11: 'H',  // Management Responsibility → Responsibility - People, Budget & Impact
+  12: 'H',  // Information & Confidentiality → Responsibility - People, Budget & Impact
+  13: 'H',  // Physical & Financial Resources → Responsibility - People, Budget & Impact
+  14: 'D',  // Strategic Planning → Key Responsibilities
+  15: 'F',  // Equality & Inclusion → Communication & Stakeholder Engagement
+  16: 'I',  // Working Conditions → Working Conditions & Environment
+};
+
 function ScoreGauge({ score, label, size = 'sm' }: { score: number; label?: string; size?: 'sm' | 'lg' }) {
   const r = size === 'lg' ? 38 : 22;
   const circ = 2 * Math.PI * r;
@@ -46,7 +66,7 @@ function ScoreGauge({ score, label, size = 'sm' }: { score: number; label?: stri
 
 export function QualityPanel() {
   const [tab, setTab] = useState<'quality' | 'eval'>('quality');
-  const { dqsScore, escoMatch, evalResult, evalLoading, fieldScores, templateSections, jd } = useJDStore();
+  const { dqsScore, escoMatch, evalResult, evalLoading, fieldScores, templateSections, jd, setActiveSectionId } = useJDStore();
 
   const handleRunEval = async () => {
     const { setEvalLoading, setEvalResult } = useJDStore.getState();
@@ -191,17 +211,31 @@ export function QualityPanel() {
                       {items.map((c) => {
                         const meta = CRITERIA.find((x) => x.id === c.id);
                         const st = STATUS_COLORS[c.status] || STATUS_COLORS.insufficient;
+                        const isGap = c.status !== 'sufficient';
+                        const targetSection = CRITERIA_TO_SECTION[c.id];
                         return (
                           <div
                             key={c.id}
-                            className="flex flex-col gap-0.5 border-l-[3px] px-3.5 py-[5px]"
+                            onClick={() => {
+                              if (isGap && targetSection) {
+                                setActiveSectionId(targetSection);
+                              }
+                            }}
+                            className={cn(
+                              'flex flex-col gap-0.5 border-l-[3px] px-3.5 py-[5px] transition-colors',
+                              isGap && targetSection && 'cursor-pointer hover:bg-brand-gold-light',
+                            )}
                             style={{ borderColor: st.text === 'text-success' ? '#2E7A3C' : st.text === 'text-warning' ? '#8A6800' : '#C0350A' }}
+                            title={isGap && targetSection ? `Go to Section ${targetSection} to fix this` : undefined}
                           >
                             <div className="flex items-center justify-between gap-[3px]">
                               <span className="min-w-[13px] text-[9px] font-bold text-text-muted">{c.id}.</span>
                               <span className="flex-1 truncate text-[10.5px] font-medium text-text-primary">
                                 {c.name || meta?.name}
                               </span>
+                              {isGap && targetSection && (
+                                <span className="mr-1 shrink-0 text-[9px] text-brand-gold">§{targetSection}</span>
+                              )}
                               <span className={cn('shrink-0 rounded-md px-1 py-0.5 text-[8.5px] font-semibold uppercase', st.bg, st.text)}>
                                 {st.label}
                               </span>

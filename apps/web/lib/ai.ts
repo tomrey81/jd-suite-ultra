@@ -1,18 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
-
-let client: Anthropic | null = null;
-
-export function getAnthropicClient(): Anthropic {
-  if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    }
-    client = new Anthropic({ apiKey });
-  }
-  return client;
-}
-
 export const AI_MODEL = process.env.AI_MODEL || 'claude-sonnet-4-20250514';
 
 export const JD_SYSTEM_PROMPT = `You are GPTs-JD-Suite_v4, a specialist assistant for JD Suite by Quadrance.
@@ -45,18 +30,35 @@ export async function callClaude(
   userMessage: string,
   maxTokens: number = 3000,
 ): Promise<string> {
-  const anthropic = getAnthropicClient();
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+  }
 
-  const response = await anthropic.messages.create({
-    model: AI_MODEL,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: 'user', content: userMessage }],
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
   });
 
-  const content = response.content[0];
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from Claude');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
+    throw new Error(err.error?.message || `Anthropic API error: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const content = data.content?.[0];
+  if (!content || content.type !== 'text') {
+    throw new Error('Unexpected response from Claude');
   }
 
   return content.text;

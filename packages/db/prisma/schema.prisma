@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -17,13 +18,16 @@ model Organisation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships    Membership[]
-  jobDescriptions JobDescription[]
-  templates      Template[]
-  orgCharts      OrgChart[]
-  batchExports   BatchExport[]
-  processes      Process[]
-  processRoles   ProcessRole[]
+  memberships          Membership[]
+  jobDescriptions      JobDescription[]
+  templates            Template[]
+  orgCharts            OrgChart[]
+  batchExports         BatchExport[]
+  processes            Process[]
+  processRoles         ProcessRole[]
+  payGroups            PayGroup[]
+  jobFamilies          JobFamily[]
+  jobArchitectureSlots JobArchitectureSlot[]
 
   @@map("organisations")
 }
@@ -146,11 +150,13 @@ model JobDescription {
   owner    User         @relation("JDOwner", fields: [ownerId], references: [id])
   template Template?    @relation(fields: [templateId], references: [id])
 
-  versions    JDVersion[]
-  comments    JDComment[]
-  guestTokens GuestToken[]
-  evalResults EvalResult[]
-  exports     Export[]
+  versions         JDVersion[]
+  comments         JDComment[]
+  guestTokens      GuestToken[]
+  evalResults      EvalResult[]
+  exports          Export[]
+  payGroupMembers  PayGroupMember[]
+  architectureSlot JobArchitectureSlot?
 
   @@index([orgId])
   @@index([ownerId])
@@ -348,4 +354,96 @@ model ProcessRole {
 
   @@unique([orgId, name])
   @@map("process_roles")
+}
+
+// ── Pay Groups (EUPTD 2023/970 Article 4) ────────────────────────────────────
+
+model PayGroup {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String   // e.g. "Pay Group A", "Senior Technical"
+  description String?
+  color       String   @default("#8A7560") // for visual distinction in matrix
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org      Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members  PayGroupMember[]
+  auditLog PayGroupAuditLog[]
+
+  @@index([orgId])
+  @@map("pay_groups")
+}
+
+model PayGroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  jdId      String
+  addedById String?
+  addedAt   DateTime @default(now())
+
+  group PayGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  jd    JobDescription @relation(fields: [jdId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, jdId])
+  @@index([groupId])
+  @@index([jdId])
+  @@map("pay_group_members")
+}
+
+// Every action on a pay group is logged with a mandatory comment (Article 4 compliance)
+model PayGroupAuditLog {
+  id        String   @id @default(uuid())
+  groupId   String
+  jdId      String?  // Which JD was affected (null = group-level action)
+  action    String   // GROUP_CREATED | JD_ADDED | JD_MOVED | JD_REMOVED | GROUP_RENAMED | AI_GROUPED
+  fromGroup String?  // Previous group name (for moves)
+  toGroup   String?  // New group name (for moves)
+  comment   String   // MANDATORY comment explaining reason for change
+  authorId  String?
+  timestamp DateTime @default(now())
+
+  group PayGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([timestamp])
+  @@map("pay_group_audit_log")
+}
+
+// ── Job Architecture Matrix ────────────────────────────────────────────────────
+
+model JobFamily {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String   // e.g. "Technology", "Sales", "Operations", "Finance"
+  description String?
+  color       String   @default("#8A7560")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  org   Organisation          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  slots JobArchitectureSlot[]
+
+  @@index([orgId])
+  @@map("job_families")
+}
+
+model JobArchitectureSlot {
+  id       String   @id @default(uuid())
+  orgId    String
+  familyId String
+  jdId     String   @unique // One JD per slot in the matrix
+  level    Int      // Grade level 1-20 (column in matrix)
+  note     String?  // Optional placement note
+  placedBy String?
+  placedAt DateTime @default(now())
+
+  org    Organisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  family JobFamily      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  jd     JobDescription @relation(fields: [jdId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([familyId])
+  @@map("job_architecture_slots")
 }

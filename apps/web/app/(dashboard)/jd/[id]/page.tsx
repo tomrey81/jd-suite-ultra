@@ -1,22 +1,17 @@
-import { auth } from '@/lib/auth';
 import { db } from '@jd-suite/db';
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { JDEditor } from '@/components/jd/jd-editor';
 import { DEFAULT_TEMPLATE_SECTIONS } from '@/lib/default-template';
 import type { TemplateSection } from '@jd-suite/types';
 
-export default async function JDEditorPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session?.user) redirect('/login');
+export const dynamic = 'force-dynamic';
 
-  const orgId = (session as any).orgId;
+export default async function JDEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   const jd = await db.jobDescription.findFirst({
-    where: { id, orgId },
-    include: {
-      template: true,
-    },
+    where: { id },
+    include: { template: true },
   });
 
   if (!jd) notFound();
