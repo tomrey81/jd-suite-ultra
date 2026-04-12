@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
   const group = await db.payGroup.create({
     data: {
-      orgId,
+      orgId: orgId!,
       name,
       description,
       color: color ?? '#8A7560',
