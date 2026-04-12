@@ -1,6 +1,7 @@
 'use client';
 
 import { useJDStore } from '@/hooks/use-jd-store';
+import Link from 'next/link';
 import { secScore } from '@/lib/jd-helpers';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,7 @@ function Ring({ pct, size = 17 }: { pct: number; size?: number }) {
 export function JDSidebar() {
   const {
     jd,
+    jdId,
     templateSections,
     activeSectionId,
     setActiveSectionId,
@@ -41,6 +43,9 @@ export function JDSidebar() {
     setShowHighlights,
     saving,
     lastSavedAt,
+    saveError,
+    setShowExport,
+    setShowVersionHistory,
   } = useJDStore();
 
   const scoreColor =
@@ -82,12 +87,14 @@ export function JDSidebar() {
         )}
 
         {/* Save status */}
-        <div className="mb-1 text-[10px] text-text-muted">
+        <div className={cn('mb-1 text-[10px]', saveError ? 'text-danger' : 'text-text-muted')}>
           {saving
-            ? 'Saving...'
-            : lastSavedAt
-              ? `Saved ${Math.round((Date.now() - lastSavedAt) / 1000)}s ago`
-              : ''}
+            ? '● Saving…'
+            : saveError
+              ? `⚠ ${saveError}`
+              : lastSavedAt
+                ? `Saved ${Math.round((Date.now() - lastSavedAt) / 1000)}s ago`
+                : ''}
         </div>
 
         {/* Field badges toggle */}
@@ -152,12 +159,28 @@ export function JDSidebar() {
         <div className="mb-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-text-muted">
           Actions
         </div>
-        <a
-          href="#preview"
-          className="flex items-center gap-[5px] rounded-md bg-brand-gold-lighter px-2.5 py-1.5 text-[11px] font-medium text-text-secondary"
+        <button
+          type="button"
+          onClick={() => setShowExport(true)}
+          className="flex w-full items-center gap-[5px] rounded-md bg-brand-gold-lighter px-2.5 py-1.5 text-left text-[11px] font-medium text-text-secondary transition-colors hover:bg-brand-gold-light"
         >
-          ⊞ Preview & Export
-        </a>
+          ⊞ Export JD
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowVersionHistory(true)}
+          className="flex w-full items-center gap-[5px] rounded-md px-2.5 py-1.5 text-left text-[11px] text-text-muted transition-colors hover:bg-surface-page hover:text-text-secondary"
+        >
+          ⊙ Version History
+        </button>
+        {jdId && jd.jobTitle && (
+          <Link
+            href={`/jd/${jdId}/studio`}
+            className="flex items-center gap-[5px] rounded-md px-2.5 py-1.5 text-[11px] text-text-muted transition-colors hover:bg-surface-page hover:text-text-secondary"
+          >
+            ♫ JD Studio
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -9,13 +9,12 @@ const NAV_ITEMS = [
   { href: '/company', icon: '◎', label: 'Company Profile' },
   { href: '/sources', icon: '⊕', label: 'External Sources' },
   { href: '/rasci', icon: '⊞', label: 'Process Intelligence' },
-  { href: '/swp', icon: '◈', label: 'Workforce Planning' },
 ];
 
 const WORKFLOW_ITEMS = [
-  { href: '/jd/new', icon: '✦', label: 'JD Builder' },
   { href: '/analyse', icon: '⌖', label: 'JD Analyser' },
-  { href: '/templates', icon: '⬡', label: 'Template Builder' },
+  { href: '/jd/new', icon: '✦', label: 'JD Builder' },
+  { href: '/studio', icon: '♫', label: 'JD Studio' },
 ];
 
 export function Sidebar() {
@@ -62,25 +61,31 @@ export function Sidebar() {
         <div className="px-4 pb-2 text-[10px] uppercase tracking-[0.1em] text-white/20">
           Workflows
         </div>
-        {WORKFLOW_ITEMS.map(({ href, icon, label }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex w-full items-center gap-2 px-4 py-[7px] text-[11px] text-white/40 transition-colors hover:text-white/60"
-          >
-            {icon} {label}
-          </Link>
-        ))}
+        {WORKFLOW_ITEMS.map(({ href, icon, label }) => {
+          const isActive = pathname === href || (href !== '/' && pathname.startsWith(href + '/'));
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                'flex w-full items-center gap-2 border-l-2 px-4 py-[7px] text-[11px] transition-colors',
+                isActive
+                  ? 'border-brand-gold bg-white/5 text-text-on-dark'
+                  : 'border-transparent text-white/40 hover:text-white/60',
+              )}
+            >
+              <span className={cn('text-[12px]', isActive ? 'text-brand-gold' : 'text-white/25')}>
+                {icon}
+              </span>
+              {label}
+            </Link>
+          );
+        })}
       </div>
 
       {/* Bottom */}
-      <div className="border-t border-white/5">
-        <Link
-          href="/templates"
-          className="flex w-full items-center gap-2 px-4 py-2.5 text-[11px] text-white/35 transition-colors hover:text-white/60"
-        >
-          ⬡ Manage Templates
-        </Link>
+      <div className="border-t border-white/5 px-4 py-3">
+        <div className="text-[9px] text-white/15">Origometrics Platform</div>
       </div>
     </aside>
   );
