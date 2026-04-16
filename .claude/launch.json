@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jd-suite-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && DATABASE_URL='postgresql://neondb_owner:npg_QV7yAskU9lPw@ep-shiny-hat-ag4zbdwj-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require' NEXTAUTH_SECRET=test-secret pnpm --filter web dev"],
+      "port": 3000
+    }
+  ]
+}

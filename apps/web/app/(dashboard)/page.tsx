@@ -23,7 +23,7 @@ export default async function WorkspacePage() {
     const [jds, templates] = await Promise.all([
       db.jobDescription.findMany({
         where: { orgId },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
         include: {
           owner: { select: { name: true, email: true } },
           _count: { select: { comments: true, versions: true } },

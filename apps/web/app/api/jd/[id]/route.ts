@@ -9,6 +9,10 @@ const updateJDSchema = z.object({
   jobCode: z.string().nullable().optional(),
   orgUnit: z.string().nullable().optional(),
   status: z.enum(['DRAFT', 'UNDER_REVISION', 'APPROVED', 'ARCHIVED']).optional(),
+  folder: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
+  careerFamily: z.string().nullable().optional(),
+  archivedAt: z.string().nullable().optional(), // ISO string or null to restore
   fieldChanged: z.string().optional(),
   oldValue: z.string().optional(),
   newValue: z.string().optional(),
@@ -27,23 +31,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     include: {
       owner: { select: { id: true, name: true, email: true } },
       template: true,
-      comments: {
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      },
-      evalResults: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-      },
-      versions: {
-        orderBy: { timestamp: 'desc' },
-        take: 50,
-      },
+      comments: { orderBy: { createdAt: 'desc' }, take: 50 },
+      evalResults: { orderBy: { createdAt: 'desc' }, take: 1 },
+      versions: { orderBy: { timestamp: 'desc' }, take: 50 },
     },
   });
 
   if (!jd) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
   return NextResponse.json(jd);
 }
 
@@ -55,7 +49,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const orgId = session?.orgId;
   const { id } = await params;
 
-  // Verify ownership
   const existing = await db.jobDescription.findFirst({ where: { id, orgId } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -75,26 +68,49 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (updates.jobCode !== undefined) updateData.jobCode = updates.jobCode;
       if (updates.orgUnit !== undefined) updateData.orgUnit = updates.orgUnit;
       if (updates.status !== undefined) updateData.status = updates.status;
+      if (updates.folder !== undefined) updateData.folder = updates.folder;
+      if (updates.sortOrder !== undefined) updateData.sortOrder = updates.sortOrder;
+      if (updates.careerFamily !== undefined) updateData.careerFamily = updates.careerFamily;
+      if (updates.archivedAt !== undefined) {
+        updateData.archivedAt = updates.archivedAt ? new Date(updates.archivedAt) : null;
+      }
 
       const updated = await tx.jobDescription.update({
         where: { id },
         data: updateData,
       });
 
-      // Create audit trail
-      const changeType = updates.status ? 'STATUS_CHANGE' : 'FIELD_EDIT';
-      await tx.jDVersion.create({
-        data: {
-          jdId: id,
-          authorId: session!.user.id,
-          authorType: 'USER',
-          changeType,
-          fieldChanged: updates.fieldChanged || (updates.status ? 'status' : undefined),
-          oldValue: updates.oldValue || (updates.status ? existing.status : undefined),
-          newValue: updates.newValue || updates.status || undefined,
-          note: updates.status ? `Status changed to ${updates.status}` : undefined,
-        },
-      });
+      // Audit trail
+      let changeType: 'STATUS_CHANGE' | 'FIELD_EDIT' = 'FIELD_EDIT';
+      let note: string | undefined;
+
+      if (updates.status) {
+        changeType = 'STATUS_CHANGE';
+        note = `Status changed to ${updates.status}`;
+      } else if (updates.archivedAt !== undefined) {
+        note = updates.archivedAt ? 'Moved to trash' : 'Restored from trash';
+      } else if (updates.folder !== undefined) {
+        note = updates.folder ? `Moved to folder "${updates.folder}"` : 'Removed from folder';
+      } else if (updates.careerFamily !== undefined) {
+        note = updates.careerFamily ? `Assigned to career family "${updates.careerFamily}"` : 'Removed from career family';
+      } else if (updates.jobTitle !== undefined) {
+        note = `Title changed to "${updates.jobTitle}"`;
+      }
+
+      if (note) {
+        await tx.jDVersion.create({
+          data: {
+            jdId: id,
+            authorId: session!.user.id,
+            authorType: 'USER',
+            changeType,
+            fieldChanged: updates.fieldChanged || undefined,
+            oldValue: updates.oldValue || undefined,
+            newValue: updates.newValue || updates.status || undefined,
+            note,
+          },
+        });
+      }
 
       return updated;
     });
