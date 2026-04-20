@@ -12,11 +12,14 @@ const NAV_ITEMS = [
 ];
 
 const GOVERNANCE_ITEMS = [
-  { href: '/analyse',      icon: '⌖',  label: 'JD Analyser' },
-  { href: '/jd/new',       icon: '✦',  label: 'Editor' },
-  { href: '/rubric',       icon: '⊡',  label: 'Rubric', badge: '25' },
+  { href: '/analyse',      icon: '⌖',  label: 'Import JD' },
+  { href: '/analyser',     icon: '⟐',  label: 'Lint Analyser', badge: '25' },
+  { href: '/editor',       icon: '✦',  label: 'AI Editor' },
+  { href: '/jd/new',       icon: '✎',  label: 'New Record' },
+  { href: '/rubric',       icon: '⊡',  label: 'Rubric' },
   { href: '/audit',        icon: '⊙',  label: 'Audit Trail' },
-  { href: '/compare',      icon: '⇄',  label: 'JD Compare' },
+  { href: '/compare',      icon: '⇄',  label: 'Version Compare' },
+  { href: '/compare/text', icon: '⇌',  label: 'Text Compare' },
 ];
 
 const STUDIO_ITEMS = [
