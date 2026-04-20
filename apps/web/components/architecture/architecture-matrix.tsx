@@ -73,62 +73,82 @@ async function removeSlot(slotId: string) {
 function MatrixCell({
   family,
   level,
-  slot,
+  slots,
   onPlace,
   onRemove,
   dragging,
 }: {
   family: JobFamily;
   level: number;
-  slot?: JDSlot;
+  slots: JDSlot[];
   onPlace: (familyId: string, level: number) => void;
   onRemove: (slotId: string) => void;
   dragging: UnplacedJD | null;
 }) {
   const [hover, setHover] = useState(false);
-  const canDrop = !slot && !!dragging;
+  const canDrop = !!dragging;
+  const hasSlots = slots.length > 0;
+  // Grow cell height with stack; baseline 72px, add 26px per extra JD, min 72 / max 220
+  const minH = hasSlots ? Math.min(220, 44 + slots.length * 28) : 72;
 
   return (
     <div
       className={cn(
-        'h-[72px] border border-border-default rounded-md transition-colors relative',
-        slot ? 'bg-white' : 'bg-surface-page',
+        'border border-border-default rounded-md transition-colors relative',
+        hasSlots ? 'bg-white' : 'bg-surface-page',
         canDrop && hover ? 'border-brand-gold bg-brand-gold-light ring-1 ring-brand-gold/30' : '',
         canDrop ? 'cursor-pointer' : '',
       )}
+      style={{ minHeight: minH }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onDragOver={(e) => { e.preventDefault(); setHover(true); }}
       onDragLeave={() => setHover(false)}
       onDrop={(e) => { e.preventDefault(); setHover(false); onPlace(family.id, level); }}
-      onClick={() => { if (canDrop) onPlace(family.id, level); }}
+      onClick={() => { if (canDrop && !hasSlots) onPlace(family.id, level); }}
     >
-      {slot ? (
-        <div className="p-1.5 h-full flex flex-col">
-          <div className="flex items-start justify-between gap-1">
-            <div className="flex items-center gap-1 min-w-0">
-              <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', STATUS_DOT[slot.jd.status] ?? 'bg-gray-400')} />
-              <Link
-                href={`/jd/${slot.jd.id}`}
-                className="truncate text-[9.5px] font-semibold text-text-primary hover:text-brand-gold leading-tight"
-              >
-                {slot.jd.jobTitle || 'Untitled'}
-              </Link>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onRemove(slot.id); }}
-              className="shrink-0 text-[10px] text-text-muted hover:text-danger transition-colors"
+      {hasSlots ? (
+        <div className="p-1 h-full flex flex-col gap-0.5">
+          {slots.map((slot) => (
+            <div
+              key={slot.id}
+              className="rounded border border-border-default/60 bg-white px-1 py-0.5 group/chip"
             >
-              ×
-            </button>
-          </div>
-          {slot.jd.orgUnit && (
-            <div className="text-[8.5px] text-text-muted truncate mt-0.5">{slot.jd.orgUnit}</div>
+              <div className="flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', STATUS_DOT[slot.jd.status] ?? 'bg-gray-400')} />
+                  <Link
+                    href={`/jd/${slot.jd.id}`}
+                    className="truncate text-[9.5px] font-semibold text-text-primary hover:text-brand-gold leading-tight"
+                    title={slot.jd.jobTitle}
+                  >
+                    {slot.jd.jobTitle || 'Untitled'}
+                  </Link>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onRemove(slot.id); }}
+                  className="shrink-0 text-[10px] text-text-muted/50 hover:text-danger transition-colors opacity-0 group-hover/chip:opacity-100"
+                  aria-label="Remove"
+                >
+                  ×
+                </button>
+              </div>
+              {slot.jd.evalResults[0] && (
+                <div className="ml-2.5 text-[7.5px] font-medium" style={{ color: family.color }}>
+                  {slot.jd.evalResults[0].overallScore}%
+                </div>
+              )}
+            </div>
+          ))}
+          {canDrop && hover && (
+            <div className="mt-0.5 rounded border border-dashed border-brand-gold bg-brand-gold-light/40 py-0.5 text-center text-[9px] text-brand-gold font-medium">
+              + add here
+            </div>
           )}
-          {slot.jd.evalResults[0] && (
-            <div className="mt-auto text-[8px] font-semibold" style={{ color: family.color }}>
-              {slot.jd.evalResults[0].overallScore}% eval
+          {!canDrop && (
+            <div className="mt-auto pt-0.5 text-[8px] text-text-muted/50 text-right">
+              {slots.length} JD{slots.length === 1 ? '' : 's'}
             </div>
           )}
         </div>
@@ -328,7 +348,7 @@ export function ArchitectureMatrix({
             {/* Family rows */}
             <div className="space-y-2">
               {families.map((family) => (
-                <div key={family.id} className="flex items-start gap-1">
+                <div key={family.id} className="flex items-stretch gap-1">
                   {/* Family label */}
                   <div
                     className="w-[136px] shrink-0 rounded-lg px-3 py-2 mr-1"
@@ -345,13 +365,13 @@ export function ArchitectureMatrix({
 
                   {/* Level cells */}
                   {LEVELS.map((level) => {
-                    const slot = family.slots.find((s) => s.level === level);
+                    const cellSlots = family.slots.filter((s) => s.level === level);
                     return (
                       <div key={level} className="w-[100px] shrink-0">
                         <MatrixCell
                           family={family}
                           level={level}
-                          slot={slot}
+                          slots={cellSlots}
                           onPlace={handlePlace}
                           onRemove={handleRemove}
                           dragging={dragging}
