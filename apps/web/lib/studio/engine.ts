@@ -1,5 +1,5 @@
-// ── JD Governance Console — Studio Engine ──────────────────────────────────
-// Ported from Quadrance Sonifikator v8. Procedural audio synthesis via Web Audio API.
+// ── JD Suite — Studio Engine ───────────────────────────────────────────────
+// Procedural audio synthesis via Web Audio API.
 // All instruments, nature sounds, and animal sounds are zero-sample, purely procedural.
 //
 // This module exposes play functions that accept an AudioContext (or OfflineAudioContext)
@@ -784,7 +784,7 @@ export async function renderInstrumentToWav(
   options: { chordMode?: boolean; speed?: number; noteDur?: number; vol?: number } = {},
 ): Promise<Blob> {
   const { chordMode = false, speed = 55, noteDur = 0.6, vol = 0.75 } = options;
-  const chars = Array.from(text || 'Quadrance');
+  const chars = Array.from(text || 'JD Suite');
   const SR = 44100;
   const rf = ROOTS[rootKey] || 440;
   const sc = SCALES[scaleKey] || SCALES.major;

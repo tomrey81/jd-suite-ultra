@@ -1,0 +1,28 @@
+/* Demo public page — kept very minimal so it's obvious where to plug your design */
+:root { --ink: #111; --hair: #e5e5e2; --bg: #fafaf8; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; background: var(--bg); color: var(--ink); }
+.topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 24px; border-bottom: 1px solid var(--hair); background: #fff;
+}
+.topbar-link { color: var(--ink); text-decoration: none; font-size: 13px; }
+.topbar-link:hover { text-decoration: underline; }
+.container { max-width: 720px; margin: 0 auto; padding: 48px 24px; }
+.hero h1 { font-size: 38px; margin: 0 0 8px; }
+.lede { color: #555; font-size: 16px; margin: 0 0 32px; }
+.card { background: #fff; border: 1px solid var(--hair); border-radius: 6px; padding: 24px; }
+.card h2 { margin-top: 0; }
+form { display: flex; flex-direction: column; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #555; }
+input, textarea {
+  font-family: inherit; font-size: 14px; padding: 8px 10px;
+  border: 1px solid var(--hair); border-radius: 4px; background: #fff;
+}
+button {
+  font-family: inherit; font-size: 14px; padding: 10px 20px;
+  background: var(--ink); color: #fff; border: 0; border-radius: 4px; cursor: pointer;
+  align-self: flex-start;
+}
+button:hover { opacity: 0.9; }
+.status { color: #555; font-size: 13px; min-height: 18px; }

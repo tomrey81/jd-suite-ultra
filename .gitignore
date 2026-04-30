@@ -11,3 +11,8 @@ dist/
 coverage/
 playwright-report/
 test-results/
+
+# Data backups — never commit (may contain real JD/client data)
+*.jsonl
+packages/db/*_backup_*
+packages/db/jd_backup_*

@@ -1,0 +1,21 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Runtime data files (created by the panel)
+backend/.admin-credentials.json
+backend/.admin-history.json
+backend/.submission-notes.json
+backend/.notification-config.json
+backend/.settings-data.json
+backend/.snapshots/
+
+# Service-account / API key files (Google, AWS, etc.)
+*-service-account*.json
+google-credentials*.json
+*.pem
+*.key

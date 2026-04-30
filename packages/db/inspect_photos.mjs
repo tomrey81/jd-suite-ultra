@@ -1,0 +1,11 @@
+import pg from 'pg';
+const { Client } = pg;
+const client = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+await client.connect();
+const cols = await client.query(`SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name='photos' ORDER BY ordinal_position`);
+console.log('photos columns:', cols.rows);
+const sample = await client.query(`SELECT * FROM photos LIMIT 2`);
+console.log('sample:', sample.rows);
+const count = await client.query(`SELECT COUNT(*)::int AS n FROM photos`);
+console.log('count:', count.rows[0].n);
+await client.end();

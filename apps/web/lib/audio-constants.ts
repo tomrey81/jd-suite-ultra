@@ -1,4 +1,4 @@
-// ── Quadrance JD Studio — Audio Constants ──────────────────────────────────
+// ── JD Studio — Audio Constants ────────────────────────────────────────────
 // Pure constants — no browser API dependencies. Safe to import server-side.
 
 export const SCALES: Record<string, number[]> = {

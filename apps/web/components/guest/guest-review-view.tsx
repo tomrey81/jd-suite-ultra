@@ -86,7 +86,7 @@ export function GuestReviewView({
           <div className="flex items-center justify-between">
             <div>
               <div className="font-display text-lg font-bold text-text-primary">
-                Quadrance <span className="text-brand-gold">JD Suite</span>
+                JD Suite
               </div>
               <div className="text-[10px] uppercase tracking-widest text-text-muted">
                 Guest Review

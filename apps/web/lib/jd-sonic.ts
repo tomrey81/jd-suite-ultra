@@ -1,4 +1,4 @@
-// ── Quadrance JD Studio — Sonic Fingerprint Engine ─────────────────────────
+// ── JD Studio — Sonic Fingerprint Engine ───────────────────────────────────
 // Pure functions — zero browser API dependencies. Safe to import server-side.
 // All functions are deterministic and idempotent for the same input.
 

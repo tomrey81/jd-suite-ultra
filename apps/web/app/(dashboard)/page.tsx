@@ -1,20 +1,31 @@
 import { db } from '@jd-suite/db';
+import { auth } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import { WorkspaceView } from '@/components/workspace/workspace-view';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WorkspacePage() {
   try {
-    const firstOrg = await db.organisation.findFirst();
-    const orgId = firstOrg?.id;
+    const session = await auth();
+    if (!session?.user?.id) redirect('/login?callbackUrl=/');
+
+    // Scope to the logged-in user's org. Without this, every user sees
+    // the same (alphabetically-first) org's JDs — a multi-tenant leak.
+    const membership = await db.membership.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { org: { createdAt: 'desc' } },
+      select: { orgId: true },
+    });
+    const orgId = membership?.orgId;
 
     if (!orgId) {
       return (
         <div className="flex flex-1 items-center justify-center p-8">
           <div className="rounded-lg border border-border-default bg-white p-8 text-center">
             <h2 className="mb-2 font-display text-lg font-bold text-text-primary">Welcome to JD Suite</h2>
-            <p className="text-sm text-text-muted">No organisation found. The database seed needs to run.</p>
-            <p className="mt-2 text-xs text-text-muted">DB connected successfully.</p>
+            <p className="text-sm text-text-muted">Your account isn&apos;t attached to an organisation yet.</p>
+            <p className="mt-2 text-xs text-text-muted">Contact your admin to be added.</p>
           </div>
         </div>
       );

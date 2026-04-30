@@ -1,0 +1,338 @@
+[
+  {
+    "id": 1,
+    "key": "follows_fixed_procedures",
+    "pl": "Osoba pracująca na tym stanowisku wykonuje pracę według ściśle określonych procedur, instrukcji lub standardów, bez możliwości odstępstw.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 2,
+    "key": "routine_under_supervision",
+    "pl": "Osoba pracująca na tym stanowisku wykonuje powtarzalne, rutynowe zadania pod bezpośrednim nadzorem przełożonego.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 3,
+    "key": "no_prior_experience",
+    "pl": "Osoba pracująca na tym stanowisku nie musi posiadać wcześniejszego doświadczenia zawodowego.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 4,
+    "key": "close_supervision",
+    "pl": "Osoba pracująca na tym stanowisku działa pod ścisłym, bezpośrednim nadzorem i regularnie raportuje postępy.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 5,
+    "key": "little_discretion",
+    "pl": "Osoba pracująca na tym stanowisku ma minimalny zakres decyzji — realizuje polecenia bez możliwości modyfikacji.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 6,
+    "key": "confirms_task_steps",
+    "pl": "Osoba pracująca na tym stanowisku potwierdza lub uzyskuje akceptację przełożonego przed kolejnymi krokami zadania.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 7,
+    "key": "structured_environment",
+    "pl": "Osoba pracująca na tym stanowisku funkcjonuje w przewidywalnym środowisku z jasnymi zasadami i oczekiwaniami.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 8,
+    "key": "structured_assignments",
+    "pl": "Osoba pracująca na tym stanowisku otrzymuje z góry przydzielone zadania o określonym zakresie i sposobie wykonania.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 9,
+    "key": "follows_verbal_written_instructions",
+    "pl": "Osoba pracująca na tym stanowisku realizuje pracę na podstawie ustnych lub pisemnych poleceń bez ich samodzielnej interpretacji.",
+    "category": "COG_LOW"
+  },
+  {
+    "id": 10,
+    "key": "general_direction",
+    "pl": "Osoba pracująca na tym stanowisku otrzymuje jedynie ogólny kierunek działania i samodzielnie dobiera metody realizacji.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 11,
+    "key": "solves_recurring_problems",
+    "pl": "Osoba pracująca na tym stanowisku regularnie mierzy się z podobnymi problemami i wypracowuje rozwiązania.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 12,
+    "key": "solves_without_precedent",
+    "pl": "Osoba pracująca na tym stanowisku zmierza się z problemami bez gotowego rozwiązania ani wzorca.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 13,
+    "key": "beyond_existing_methods",
+    "pl": "Osoba pracująca na tym stanowisku tworzy nowe podejścia, metodologie lub narzędzia, wykraczając poza istniejące standardy.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 14,
+    "key": "determines_escalation",
+    "pl": "Osoba pracująca na tym stanowisku samodzielnie ocenia kiedy problem wymaga eskalacji i podejmuje tę decyzję.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 15,
+    "key": "unpredictable_contexts",
+    "pl": "Osoba pracująca na tym stanowisku funkcjonuje w środowisku o wysokiej zmienności wymagającym ciągłej adaptacji.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 16,
+    "key": "varied_non_routine",
+    "pl": "Osoba pracująca na tym stanowisku wykonuje szeroki i zróżnicowany zakres zadań, gdzie każde wymaga indywidualnego podejścia.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 17,
+    "key": "expert_own_discipline",
+    "pl": "Osoba pracująca na tym stanowisku jest uznanym ekspertem posiadającym pogłębioną i specjalistyczną wiedzę.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 18,
+    "key": "conducts_applied_research",
+    "pl": "Osoba pracująca na tym stanowisku prowadzi badania w celu opracowania nowych rozwiązań, produktów lub procesów.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 19,
+    "key": "writes_analytical_reports",
+    "pl": "Osoba pracująca na tym stanowisku regularnie opracowuje raporty analityczne wymagające głębokiej analizy danych.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 20,
+    "key": "plans_establishes_milestones",
+    "pl": "Osoba pracująca na tym stanowisku samodzielnie planuje harmonogram i wyznacza kamienie milowe dla siebie lub innych.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 21,
+    "key": "performs_project_management",
+    "pl": "Osoba pracująca na tym stanowisku ponosi formalną odpowiedzialność za zarządzanie projektami — zakresem, budżetem i harmonogramem.",
+    "category": "COG_HIGH"
+  },
+  {
+    "id": 22,
+    "key": "provides_direct_customer_service",
+    "pl": "Osoba pracująca na tym stanowisku regularnie i bezpośrednio kontaktuje się z klientami zewnętrznymi.",
+    "category": "S2_COMM"
+  },
+  {
+    "id": 23,
+    "key": "manages_external_stakeholders",
+    "pl": "Osoba pracująca na tym stanowisku aktywnie zarządza relacjami z kluczowymi interesariuszami zewnętrznymi.",
+    "category": "S2_COMM"
+  },
+  {
+    "id": 24,
+    "key": "represents_org_externally",
+    "pl": "Osoba pracująca na tym stanowisku oficjalnie reprezentuje organizację wobec partnerów, mediów, instytucji lub na konferencjach.",
+    "category": "S2_COMM"
+  },
+  {
+    "id": 25,
+    "key": "develops_professional_network",
+    "pl": "Osoba pracująca na tym stanowisku aktywnie buduje i utrzymuje sieć kontaktów zawodowych jako istotny element roli.",
+    "category": "S2_COMM"
+  },
+  {
+    "id": 26,
+    "key": "performs_physical_manual_work",
+    "pl": "Osoba pracująca na tym stanowisku wykonuje pracę wymagającą regularnego wysiłku fizycznego lub precyzji manualnej.",
+    "category": "PHY"
+  },
+  {
+    "id": 27,
+    "key": "operates_maintains_equipment",
+    "pl": "Osoba pracująca na tym stanowisku obsługuje, konfiguruje lub serwisuje specjalistyczny sprzęt lub maszyny.",
+    "category": "PHY"
+  },
+  {
+    "id": 28,
+    "key": "manages_staff_directly",
+    "pl": "Osoba pracująca na tym stanowisku jest formalnym przełożonym przynajmniej jednej osoby i ponosi odpowiedzialność za jej wyniki.",
+    "category": "R1_PEOPLE"
+  },
+  {
+    "id": 29,
+    "key": "coaches_evaluates_team",
+    "pl": "Osoba pracująca na tym stanowisku ponosi formalną odpowiedzialność za szkolenie, mentoring i ocenę pracowników.",
+    "category": "R1_PEOPLE"
+  },
+  {
+    "id": 30,
+    "key": "manages_managers",
+    "pl": "Osoba pracująca na tym stanowisku zarządza osobami, które same pełnią funkcje kierownicze — jest menedżerem menedżerów.",
+    "category": "R1_PEOPLE"
+  },
+  {
+    "id": 31,
+    "key": "full_mgmt_authority",
+    "pl": "Osoba pracująca na tym stanowisku posiada pełne uprawnienia zarządcze — rekrutację, zwalnianie, wynagrodzenia i oceny.",
+    "category": "R1_PEOPLE"
+  },
+  {
+    "id": 32,
+    "key": "oversees_senior_leaders",
+    "pl": "Osoba pracująca na tym stanowisku bezpośrednio nadzoruje osoby na stanowiskach kierowniczych wyższego szczebla.",
+    "category": "R1_PEOPLE"
+  },
+  {
+    "id": 33,
+    "key": "drives_professional_development_others",
+    "pl": "Osoba pracująca na tym stanowisku ponosi formalną odpowiedzialność za kształtowanie ścieżek kariery innych osób.",
+    "category": "R1_PEOPLE"
+  },
+  {
+    "id": 34,
+    "key": "accountable_for_budget",
+    "pl": "Osoba pracująca na tym stanowisku ponosi formalną odpowiedzialność za planowanie i realizację budżetu swojego obszaru.",
+    "category": "R3_FIN"
+  },
+  {
+    "id": 35,
+    "key": "accountable_for_pnl",
+    "pl": "Osoba pracująca na tym stanowisku odpowiada za wynik finansowy (przychody i koszty) swojego obszaru lub jednostki.",
+    "category": "R3_FIN"
+  },
+  {
+    "id": 36,
+    "key": "influences_resource_allocation",
+    "pl": "Osoba pracująca na tym stanowisku ma realny wpływ na decyzje dotyczące alokacji zasobów — ludzi, budżetu lub aktywów.",
+    "category": "R3_FIN"
+  },
+  {
+    "id": 37,
+    "key": "shapes_function_strategy",
+    "pl": "Osoba pracująca na tym stanowisku aktywnie kształtuje strategię swojej funkcji lub obszaru — nie tylko ją realizuje.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 38,
+    "key": "influences_strategic_direction",
+    "pl": "Osoba pracująca na tym stanowisku podejmuje decyzje lub formułuje rekomendacje mające realny wpływ na kierunek strategiczny całej organizacji.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 39,
+    "key": "highest_authority_planning",
+    "pl": "Osoba pracująca na tym stanowisku jest najwyższym autorytetem w zakresie planowania strategicznego — nie ma nad nią wyższego szczebla.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 40,
+    "key": "sets_enterprise_vision",
+    "pl": "Osoba pracująca na tym stanowisku definiuje lub współtworzy misję i wizję całej organizacji.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 41,
+    "key": "org_wide_impact",
+    "pl": "Osoba pracująca na tym stanowisku podejmuje decyzje mające bezpośredni wpływ na całą organizację.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 42,
+    "key": "impact_beyond_team",
+    "pl": "Osoba pracująca na tym stanowisku realizuje działania mające istotny wpływ na inne zespoły lub obszary organizacji.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 43,
+    "key": "leads_multiple_functions",
+    "pl": "Osoba pracująca na tym stanowisku sprawuje przywództwo nad wieloma różnymi funkcjami organizacji jednocześnie.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 44,
+    "key": "shapes_org_culture",
+    "pl": "Osoba pracująca na tym stanowisku aktywnie kształtuje kulturę organizacyjną poprzez wzorce zachowań, komunikację i decyzje.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 45,
+    "key": "member_executive_committee",
+    "pl": "Osoba pracująca na tym stanowisku jest formalnym członkiem najwyższego gremium decyzyjnego organizacji.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 46,
+    "key": "reports_to_board",
+    "pl": "Osoba pracująca na tym stanowisku raportuje bezpośrednio do rady nadzorczej, zarządu lub właścicieli organizacji.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 47,
+    "key": "influences_industry",
+    "pl": "Osoba pracująca na tym stanowisku podejmuje działania lub decyzje kształtujące standardy lub praktyki całej branży.",
+    "category": "R4_STRAT"
+  },
+  {
+    "id": 48,
+    "key": "ensures_regulatory_compliance",
+    "pl": "Osoba pracująca na tym stanowisku jest właścicielem procesów zapewnienia zgodności z regulacjami prawnymi.",
+    "category": "RISK"
+  },
+  {
+    "id": 49,
+    "key": "performs_risk_analysis",
+    "pl": "Osoba pracująca na tym stanowisku przeprowadza formalne analizy ryzyka i rekomenduje działania mitygacyjne.",
+    "category": "RISK"
+  },
+  {
+    "id": 50,
+    "key": "handles_emotionally_demanding_situations",
+    "pl": "Osoba pracująca na tym stanowisku regularnie kontaktuje się z osobami w trudnych sytuacjach emocjonalnych.",
+    "category": "EMO"
+  },
+  {
+    "id": 51,
+    "key": "provides_care_or_welfare_services",
+    "pl": "Osoba pracująca na tym stanowisku świadczy usługi opiekuńcze, medyczne, socjalne lub edukacyjne na rzecz innych.",
+    "category": "EMO"
+  },
+  {
+    "id": 52,
+    "key": "works_in_hazardous_conditions",
+    "pl": "Osoba pracująca na tym stanowisku wykonuje pracę w warunkach stwarzających ryzyko dla jej zdrowia lub bezpieczeństwa.",
+    "category": "PHY"
+  },
+  {
+    "id": 53,
+    "key": "responsible_for_client_wellbeing",
+    "pl": "Osoba pracująca na tym stanowisku ponosi formalną odpowiedzialność za dobrostan, bezpieczeństwo lub jakość życia klientów.",
+    "category": "EMO"
+  },
+  {
+    "id": 54,
+    "key": "manages_confidential_personal_data",
+    "pl": "Osoba pracująca na tym stanowisku regularnie przetwarza dane poufne lub osobowe i ponosi formalną odpowiedzialność za ich ochronę.",
+    "category": "EMO"
+  },
+  {
+    "id": 54,
+    "key": "manages_confidential_personal_data",
+    "pl": "Osoba pracująca na tym stanowisku regularnie przetwarza dane poufne lub osobowe i ponosi formalną odpowiedzialność za ich ochronę.",
+    "category": "EMO"
+  },
+  {
+    "id": 55,
+    "key": "coordinates_team_work",
+    "pl": "Osoba koordynuje pracę członków zespołu",
+    "category": "R1_PEOPLE"
+  }
+]

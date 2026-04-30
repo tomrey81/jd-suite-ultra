@@ -1,0 +1,21 @@
+language,code_type,pattern_type,pattern,severity,notes,source,version,added_by,added_at
+pl,agentic,regex,\b(rywalizacj\w*|rywal\w+)\b,medium,competitive/competition stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(konkurencyjn\w*|konkurencj\w*)\b,medium,competitive stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(agresywn\w*|agresyw\w*|agresj\w*)\b,medium,aggressive stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(asertywn\w*|asertywn\w*)\b,medium,assertive stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(bezkompromisow\w*)\b,medium,uncompromising stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(dominacj\w*|dominuj\w*|dominant\w*)\b,medium,dominance/dominant stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(zdecydowan\w*|zdecydowani\w*)\b,low,decisive stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(ambitn\w*|ambicj\w*)\b,low,ambitious stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(samodzieln\w*|samodzielnoś\w*)\b,low,self-reliant stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(nieustępliw\w*)\b,medium,relentless stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(walcz\w+|walk\w+|zawalcz\w+)\b,medium,fight stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(zwyci[eę]ż\w*|zwyci[eę]stw\w*)\b,medium,victory stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(silnych?|silnej?|siln[ai]e?|silni)\b,low,strong stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(odważn\w*|odwag\w*)\b,low,brave stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(niezależn\w*|niezależnoś\w*)\b,low,independent stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(rezultat\w*|wynik\w*-driven|nastawion\w+ na rezultat\w*)\b,low,results-driven idiom,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(lider\w*|liderze)\b,low,leader stem (contextual),internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(pewn\w+ siebie|pewność siebie)\b,low,self-confident phrase,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(ekspansywn\w*|ekspansj\w*)\b,medium,expansive stem,internal,1.0,trey,2026-04-29
+pl,agentic,regex,\b(young\w*|młody\w*|młodzi|młodej?|młod\w*)\b,medium,young — demographic proxy (H-E-06),internal,1.0,trey,2026-04-29

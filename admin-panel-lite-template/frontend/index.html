@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo Site — Admin Panel Lite</title>
+  <link rel="stylesheet" href="/css/public.css">
+</head>
+<body>
+  <header class="topbar">
+    <strong>Demo Site</strong>
+    <a href="/admin.html" class="topbar-link">Admin</a>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1 data-bind="hero.title">Welcome.</h1>
+      <p class="lede" data-bind="hero.subtitle">This page reads its content from the admin panel.</p>
+    </section>
+
+    <section class="card">
+      <h2>Get in touch</h2>
+      <form id="submission-form" novalidate>
+        <label>Name<input name="name" required></label>
+        <label>Email<input name="email" type="email" required></label>
+        <label>Subject<input name="subject"></label>
+        <label>Message<textarea name="message" rows="4"></textarea></label>
+        <button type="submit">Send</button>
+        <p id="form-status" class="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    // Hydrate any element with [data-bind] from /api/admin/public-settings
+    fetch('/api/admin/public-settings').then(r => r.json()).then(data => {
+      document.querySelectorAll('[data-bind]').forEach(el => {
+        const key = el.getAttribute('data-bind');
+        if (data[key]) el.innerHTML = data[key]; // server already sanitised
+      });
+    }).catch(() => {});
+
+    document.getElementById('submission-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const status = document.getElementById('form-status');
+      const fd = new FormData(e.target);
+      const payload = Object.fromEntries(fd.entries());
+      status.textContent = 'Sending…';
+      try {
+        const r = await fetch('/api/submissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const j = await r.json();
+        if (r.ok) { status.textContent = 'Thanks — we got your message.'; e.target.reset(); }
+        else { status.textContent = (j.error || 'Error') + ' — ' + (j.details ? j.details.map(d => d.msg).join(', ') : ''); }
+      } catch (err) {
+        status.textContent = 'Network error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

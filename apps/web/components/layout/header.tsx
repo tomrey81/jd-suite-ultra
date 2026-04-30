@@ -19,30 +19,37 @@ export function Header({ user }: HeaderProps) {
   const isJDEditor = pathname.startsWith('/jd/') && pathname !== '/jd/new';
 
   return (
-    <header className="flex h-[54px] shrink-0 items-center justify-between bg-surface-header px-5">
-      {/* Left: Branding + JD title */}
-      <div className="flex items-center gap-3">
-        <a href="/" className="cursor-pointer">
-          <div className="font-display text-[15px] font-semibold text-text-on-dark">
-            Quadrance <span className="text-brand-gold-light">JD Suite</span>
-          </div>
-          <div className="text-[9px] uppercase tracking-[0.12em] text-brand-gold opacity-70">
-            Origometrics Platform
-          </div>
-        </a>
-        {isJDEditor && <JDHeaderControls />}
-      </div>
+    <header className="flex h-[60px] shrink-0 items-center justify-between bg-surface-header px-6">
+      {/* Left: Wordmark */}
+      <a href="/" className="cursor-pointer select-none">
+        <span className="font-display text-[17px] tracking-[0.25em] text-text-on-dark/90">
+          JD SUITE
+        </span>
+      </a>
 
-      {/* Right: User */}
+      {/* Center: JD context pill */}
+      {isJDEditor && (
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-full bg-white/[0.07] px-5 py-1.5 backdrop-blur-sm">
+            <JDHeaderControls />
+          </div>
+        </div>
+      )}
+
+      {/* Right: Actions + User */}
       <div className="flex items-center gap-3">
         {isJDEditor && <JDHeaderActions />}
-        <span className="text-xs text-text-on-dark/50">{user.name || user.email}</span>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="rounded-md border border-white/10 px-3 py-1 text-xs text-text-on-dark/50 transition-colors hover:border-brand-gold hover:text-brand-gold"
-        >
-          Sign Out
-        </button>
+        <div className="ml-1 flex items-center gap-2.5 rounded-full bg-white/[0.07] py-1.5 pl-4 pr-1.5">
+          <span className="text-[12px] tracking-wide text-text-on-dark/50">
+            {user.name || user.email}
+          </span>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="rounded-full bg-white/[0.08] px-3.5 py-1 text-[11px] font-medium tracking-wide text-text-on-dark/60 transition-all hover:bg-white/[0.14] hover:text-text-on-dark/90"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -54,33 +61,35 @@ function JDHeaderControls() {
 
   return (
     <>
-      <div className="h-5 w-px bg-white/10" />
-      <div className="max-w-[220px] truncate text-xs text-text-on-dark/50">{jobTitle}</div>
-      <div className="flex items-center gap-[3px] rounded-lg bg-white/5 px-2.5 py-1">
-        <span className="text-[11px] text-text-on-dark/50">DC:</span>
+      <span className="max-w-[200px] truncate text-[12px] tracking-wide text-text-on-dark/60">{jobTitle}</span>
+      <div className="h-3.5 w-px bg-white/10" />
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] uppercase tracking-widest text-text-on-dark/40">DC</span>
         <span
           className={cn(
-            'text-xs font-bold',
+            'text-[12px] font-semibold tabular-nums',
             dqsScore >= 75 ? 'text-[#6BCB77]' : dqsScore >= 50 ? 'text-[#F0C040]' : 'text-[#FF7B6B]',
           )}
         >
           {dqsScore}%
         </span>
-        {ersScore != null && (
-          <>
-            <div className="mx-1 h-3 w-px bg-white/15" />
-            <span className="text-[11px] text-text-on-dark/50">ERS:</span>
+      </div>
+      {ersScore != null && (
+        <>
+          <div className="h-3.5 w-px bg-white/10" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] uppercase tracking-widest text-text-on-dark/40">ERS</span>
             <span
               className={cn(
-                'text-xs font-bold',
+                'text-[12px] font-semibold tabular-nums',
                 ersScore >= 75 ? 'text-[#6BCB77]' : ersScore >= 50 ? 'text-[#F0C040]' : 'text-[#FF7B6B]',
               )}
             >
               {ersScore}%
             </span>
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -236,51 +245,47 @@ function JDHeaderActions() {
     }
   };
 
+  const spinnerEl = <span className="inline-block h-3 w-3 animate-spin rounded-full border-[1.5px] border-white/30 border-t-white" />;
+
   return (
-    <div className="flex items-center gap-[7px]">
+    <div className="flex items-center gap-2">
       {/* Export */}
       <button
         onClick={handleExport}
-        className="rounded-md border border-white/10 px-3 py-1 text-xs font-medium text-text-on-dark/50 transition-colors hover:border-white/30 hover:text-text-on-dark/80"
+        className="rounded-full border border-white/[0.08] px-4 py-1.5 text-[11px] font-medium tracking-wide text-text-on-dark/50 transition-all hover:border-white/20 hover:text-text-on-dark/80"
         title="Export JD in multiple formats"
       >
-        ⊞ Export
+        Export
       </button>
 
       {/* Honest Review */}
       <button
         onClick={handleHonestReview}
         disabled={!hasTitle || !hasMeaningfulContent || honestReviewLoading}
-        className="inline-flex items-center gap-[5px] rounded-md border-none bg-[#4F46E5] px-3.5 py-1 text-xs font-medium text-white transition-opacity disabled:opacity-40"
+        className="inline-flex items-center gap-1.5 rounded-full bg-[#4F46E5]/80 px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-[#4F46E5] disabled:opacity-35"
         title={!hasMeaningfulContent ? 'Add more content before reviewing' : 'AI honest assessment of JD quality'}
       >
-        {honestReviewLoading ? (
-          <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />Reviewing…</>
-        ) : '◆ Honest Review'}
+        {honestReviewLoading ? <>{spinnerEl} Reviewing…</> : 'Honest Review'}
       </button>
 
       {/* End for Now */}
       <button
         onClick={handleEndForNow}
         disabled={endSessionLoading}
-        className="inline-flex items-center gap-[5px] rounded-md border-none bg-brand-gold px-3.5 py-1 text-xs font-medium text-white disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-full bg-brand-gold/90 px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-brand-gold disabled:opacity-40"
         title="Save progress and get AI session summary"
       >
-        {endSessionLoading ? (
-          <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />Saving…</>
-        ) : '⏹ End for Now'}
+        {endSessionLoading ? <>{spinnerEl} Saving…</> : 'End for Now'}
       </button>
 
       {/* Evaluate */}
       <button
         onClick={handleEvaluate}
         disabled={!hasTitle || evalLoading}
-        className="inline-flex items-center gap-[5px] rounded-md border-none bg-cat-skills px-3.5 py-1 text-xs font-medium text-white transition-opacity disabled:opacity-40"
+        className="inline-flex items-center gap-1.5 rounded-full bg-cat-skills/80 px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-cat-skills disabled:opacity-35"
         title="Run ILO-aligned 16-criteria pay equity evaluation"
       >
-        {evalLoading ? (
-          <><span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />Evaluating…</>
-        ) : '◆ Evaluate'}
+        {evalLoading ? <>{spinnerEl} Evaluating…</> : 'Evaluate'}
       </button>
     </div>
   );

@@ -1,11 +1,11 @@
-import { StudioSoloView } from '@/components/studio/studio-solo-view';
+import { SonificatorView } from '@/components/studio/sonificator-view';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Studio Solo — JD Governance Console',
+  title: 'Sonificator — JD Suite',
 };
 
 export default function StudioPage() {
-  return <StudioSoloView />;
+  return <SonificatorView />;
 }

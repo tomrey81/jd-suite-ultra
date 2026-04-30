@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { abbrevFamily, formatPositionCode } from '@/lib/position-code';
+import { AXIOMERA_BANDS, gradeToBandCode, getBand, visibleGrades } from '@/lib/architecture/axiomera-bands';
 
 interface JDSlot {
   id: string;
   jdId: string;
   level: number;
   note?: string;
-  jd: { id: string; jobTitle: string; orgUnit?: string; status: string; evalResults: { overallScore: number }[] };
+  jd: { id: string; jobTitle: string; orgUnit?: string; jobCode?: string | null; status: string; evalResults: { overallScore: number }[] };
 }
 
 interface JobFamily {
@@ -25,12 +27,13 @@ interface UnplacedJD {
   id: string;
   jobTitle: string;
   orgUnit?: string;
+  jobCode?: string | null;
   status: string;
   data: Record<string, string>;
 }
 
-// Grade levels shown in the matrix
-const LEVELS = Array.from({ length: 15 }, (_, i) => i + 1); // 1–15
+// Axiomera grades 6-30, descending (E5 executive at top → A1 entry at bottom).
+const ALL_GRADES_DESC = Array.from({ length: 25 }, (_, i) => 30 - i);
 
 const FAMILY_COLORS = ['#8A7560', '#2D7A4F', '#5B6CB5', '#A0601A', '#9E2B1D', '#4A7FA5', '#7B5EA7'];
 
@@ -42,7 +45,6 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 // ── API helpers ────────────────────────────────────────────────────────────────
-
 async function createFamily(name: string, description: string, color: string) {
   const res = await fetch('/api/architecture/families', {
     method: 'POST',
@@ -68,15 +70,80 @@ async function removeSlot(slotId: string) {
   if (!res.ok) throw new Error('Failed to remove');
 }
 
-// ── JD Card ───────────────────────────────────────────────────────────────────
+// ── JD chip (2-line title + 1-line code) ───────────────────────────────────────
+
+function JDChip({
+  family,
+  slot,
+  seqInCell,
+  onRemove,
+  compact,
+}: {
+  family: JobFamily;
+  slot: JDSlot;
+  seqInCell: number;
+  onRemove: (slotId: string) => void;
+  compact: boolean;
+}) {
+  const code = slot.jd.jobCode || formatPositionCode(family.name, slot.level, seqInCell);
+  const evalScore = slot.jd.evalResults[0]?.overallScore;
+  const statusLabel: Record<string, string> = {
+    DRAFT: 'Draft',
+    UNDER_REVISION: 'Under review',
+    APPROVED: 'Approved',
+    ARCHIVED: 'Archived',
+  };
+
+  return (
+    <div
+      className="group/chip rounded-md border border-border-default/70 bg-white px-1.5 py-1 transition-colors hover:border-brand-gold"
+      title={`${slot.jd.jobTitle}\nStatus: ${statusLabel[slot.jd.status] || slot.jd.status}${evalScore != null ? `\nEvaluation: ${evalScore}%` : '\nNot yet evaluated'}`}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <span
+          className={cn('mt-1 h-1.5 w-1.5 rounded-full shrink-0', STATUS_DOT[slot.jd.status] ?? 'bg-gray-400')}
+          title={statusLabel[slot.jd.status] || slot.jd.status}
+        />
+        <div className="min-w-0 flex-1">
+          <Link href={`/jd/${slot.jd.id}`}
+            className="block text-[10.5px] font-semibold leading-[1.2] text-text-primary hover:text-brand-gold line-clamp-2">
+            {slot.jd.jobTitle || 'Untitled'}
+          </Link>
+          <div className="mt-0.5 flex items-center gap-1">
+            <span className="font-mono text-[8.5px] font-bold tracking-wide" style={{ color: family.color }}>
+              {code}
+            </span>
+            {evalScore != null ? (
+              <span
+                className={cn(
+                  'rounded-full px-1 py-px text-[8px] font-bold',
+                  evalScore >= 75 ? 'bg-emerald-100 text-emerald-700' :
+                  evalScore >= 50 ? 'bg-amber-100 text-amber-700' :
+                  'bg-red-100 text-red-700',
+                )}
+                title={`Axiomera evaluation score ${evalScore}%`}
+              >
+                {evalScore}
+              </span>
+            ) : !compact && (
+              <span className="text-[8px] text-text-muted/60" title="No evaluation yet">·</span>
+            )}
+          </div>
+        </div>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onRemove(slot.id); }}
+          className="shrink-0 text-[11px] leading-none text-text-muted/40 opacity-0 transition-opacity hover:text-danger group-hover/chip:opacity-100"
+          aria-label="Remove">
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Cell ──────────────────────────────────────────────────────────────────────
 
 function MatrixCell({
-  family,
-  level,
-  slots,
-  onPlace,
-  onRemove,
-  dragging,
+  family, level, slots, onPlace, onRemove, dragging, compact,
 }: {
   family: JobFamily;
   level: number;
@@ -84,81 +151,45 @@ function MatrixCell({
   onPlace: (familyId: string, level: number) => void;
   onRemove: (slotId: string) => void;
   dragging: UnplacedJD | null;
+  compact: boolean;
 }) {
   const [hover, setHover] = useState(false);
   const canDrop = !!dragging;
   const hasSlots = slots.length > 0;
-  // Grow cell height with stack; baseline 72px, add 26px per extra JD, min 72 / max 220
-  const minH = hasSlots ? Math.min(220, 44 + slots.length * 28) : 72;
 
   return (
     <div
       className={cn(
-        'border border-border-default rounded-md transition-colors relative',
-        hasSlots ? 'bg-white' : 'bg-surface-page',
-        canDrop && hover ? 'border-brand-gold bg-brand-gold-light ring-1 ring-brand-gold/30' : '',
+        'relative h-full border-r border-b border-border-default/60 transition-colors',
+        canDrop && hover ? 'bg-brand-gold-light/40 ring-1 ring-brand-gold/30' : '',
         canDrop ? 'cursor-pointer' : '',
+        hasSlots ? 'bg-white' : 'bg-surface-page/30',
       )}
-      style={{ minHeight: minH }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onDragOver={(e) => { e.preventDefault(); setHover(true); }}
       onDragLeave={() => setHover(false)}
       onDrop={(e) => { e.preventDefault(); setHover(false); onPlace(family.id, level); }}
-      onClick={() => { if (canDrop && !hasSlots) onPlace(family.id, level); }}
-    >
+      onClick={() => { if (canDrop) onPlace(family.id, level); }}>
       {hasSlots ? (
-        <div className="p-1 h-full flex flex-col gap-0.5">
-          {slots.map((slot) => (
-            <div
-              key={slot.id}
-              className="rounded border border-border-default/60 bg-white px-1 py-0.5 group/chip"
-            >
-              <div className="flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', STATUS_DOT[slot.jd.status] ?? 'bg-gray-400')} />
-                  <Link
-                    href={`/jd/${slot.jd.id}`}
-                    className="truncate text-[9.5px] font-semibold text-text-primary hover:text-brand-gold leading-tight"
-                    title={slot.jd.jobTitle}
-                  >
-                    {slot.jd.jobTitle || 'Untitled'}
-                  </Link>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onRemove(slot.id); }}
-                  className="shrink-0 text-[10px] text-text-muted/50 hover:text-danger transition-colors opacity-0 group-hover/chip:opacity-100"
-                  aria-label="Remove"
-                >
-                  ×
-                </button>
-              </div>
-              {slot.jd.evalResults[0] && (
-                <div className="ml-2.5 text-[7.5px] font-medium" style={{ color: family.color }}>
-                  {slot.jd.evalResults[0].overallScore}%
-                </div>
-              )}
-            </div>
+        <div className="flex h-full flex-col gap-1 p-1">
+          {slots.map((slot, i) => (
+            <JDChip key={slot.id} family={family} slot={slot} seqInCell={i + 1}
+              onRemove={onRemove} compact={compact} />
           ))}
           {canDrop && hover && (
-            <div className="mt-0.5 rounded border border-dashed border-brand-gold bg-brand-gold-light/40 py-0.5 text-center text-[9px] text-brand-gold font-medium">
+            <div className="rounded border border-dashed border-brand-gold py-0.5 text-center text-[9px] font-medium text-brand-gold">
               + add here
-            </div>
-          )}
-          {!canDrop && (
-            <div className="mt-auto pt-0.5 text-[8px] text-text-muted/50 text-right">
-              {slots.length} JD{slots.length === 1 ? '' : 's'}
             </div>
           )}
         </div>
       ) : canDrop && hover ? (
-        <div className="flex h-full items-center justify-center text-[10px] text-brand-gold font-medium">
+        <div className="flex h-full items-center justify-center text-[10px] font-medium text-brand-gold">
           Drop here
         </div>
       ) : (
         <div className="flex h-full items-center justify-center">
-          <span className="text-[9px] text-text-muted/40">—</span>
+          <span className="text-[8px] text-text-muted/40">·</span>
         </div>
       )}
     </div>
@@ -170,7 +201,7 @@ function MatrixCell({
 export function ArchitectureMatrix({
   initialFamilies,
   unplacedJDs,
-  orgId,
+  orgId: _orgId,
 }: {
   initialFamilies: JobFamily[];
   unplacedJDs: UnplacedJD[];
@@ -179,6 +210,7 @@ export function ArchitectureMatrix({
   const [families, setFamilies] = useState<JobFamily[]>(initialFamilies);
   const [unplaced, setUnplaced] = useState<UnplacedJD[]>(unplacedJDs);
   const [dragging, setDragging] = useState<UnplacedJD | null>(null);
+  const [showAllGrades, setShowAllGrades] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -187,6 +219,25 @@ export function ArchitectureMatrix({
   const [familyName, setFamilyName] = useState('');
   const [familyDesc, setFamilyDesc] = useState('');
   const [familyColor, setFamilyColor] = useState('#8A7560');
+
+  // Auto-rescale: as family count grows, columns shrink to fit one viewport.
+  // We compute a column width from the available horizontal space.
+  const [viewportWidth, setViewportWidth] = useState<number>(1280);
+  useEffect(() => {
+    const update = () => setViewportWidth(window.innerWidth);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  const sidebarWidth = 220;       // unplaced rail
+  const navWidth = 214;            // app sidebar
+  const headerWidth = 56;          // level-label column inside the matrix
+  const padding = 32;
+  const available = Math.max(640, viewportWidth - sidebarWidth - navWidth - headerWidth - padding);
+  const numFamilies = Math.max(1, families.length);
+  // Min 110 px per column to keep titles readable, max 220 px to avoid huge gaps
+  const colWidth = Math.max(110, Math.min(220, Math.floor(available / numFamilies)));
+  const compact = colWidth < 140;
 
   const refetch = useCallback(async () => {
     const res = await fetch('/api/architecture/families');
@@ -205,8 +256,8 @@ export function ArchitectureMatrix({
       setShowNewFamily(false);
       setFamilyName('');
       setFamilyDesc('');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -214,25 +265,22 @@ export function ArchitectureMatrix({
 
   const handlePlace = useCallback(async (familyId: string, level: number) => {
     if (!dragging) return;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       await placeJD(familyId, dragging.id, level, '');
       setUnplaced((prev) => prev.filter((j) => j.id !== dragging.id));
       setDragging(null);
       await refetch();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   }, [dragging, refetch]);
 
   const handleRemove = useCallback(async (slotId: string) => {
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
-      // Find the JD to put back in unplaced
       const slot = families.flatMap((f) => f.slots).find((s) => s.id === slotId);
       await removeSlot(slotId);
       if (slot) {
@@ -240,22 +288,50 @@ export function ArchitectureMatrix({
           id: slot.jd.id,
           jobTitle: slot.jd.jobTitle,
           orgUnit: slot.jd.orgUnit,
+          jobCode: slot.jd.jobCode,
           status: slot.jd.status,
           data: {},
         }]);
       }
       await refetch();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setLoading(false);
     }
   }, [families, refetch]);
 
+  // Pre-compute slots[familyId][level] for fast cell lookup
+  const slotsIndex = useMemo(() => {
+    const idx = new Map<string, Map<number, JDSlot[]>>();
+    for (const f of families) {
+      const fmap = new Map<number, JDSlot[]>();
+      for (const s of f.slots) {
+        const list = fmap.get(s.level) || [];
+        list.push(s);
+        fmap.set(s.level, list);
+      }
+      idx.set(f.id, fmap);
+    }
+    return idx;
+  }, [families]);
+
+  // Smart grade visibility — show only grades with placements + ±1 buffer,
+  // unless user toggles "show all grades".
+  const placedGrades = useMemo(() => {
+    const set = new Set<number>();
+    for (const f of families) for (const s of f.slots) set.add(s.level);
+    return Array.from(set);
+  }, [families]);
+  const visibleGradeList = useMemo(() => {
+    if (showAllGrades) return ALL_GRADES_DESC;
+    return visibleGrades(placedGrades, 2);
+  }, [placedGrades, showAllGrades]);
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Left: Unplaced JDs ──────────────────────────────── */}
-      <div className="w-[220px] shrink-0 border-r border-border-default bg-surface-page flex flex-col">
+      <div className="flex w-[220px] shrink-0 flex-col border-r border-border-default bg-surface-page">
         <div className="border-b border-border-default p-4">
           <div className="text-xs font-semibold text-text-primary">
             Unplaced JDs
@@ -267,26 +343,29 @@ export function ArchitectureMatrix({
           </div>
           <div className="mt-1 text-[10px] text-text-muted">Drag onto the matrix to place</div>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+        <div className="flex-1 space-y-1.5 overflow-y-auto p-3">
           {unplaced.length === 0 ? (
             <div className="py-6 text-center text-[10px] text-text-muted">All JDs placed ✓</div>
           ) : (
             unplaced.map((jd) => (
-              <div
-                key={jd.id}
+              <div key={jd.id}
                 draggable
                 onDragStart={() => setDragging(jd)}
                 onDragEnd={() => setDragging(null)}
                 className={cn(
                   'cursor-grab rounded-lg border border-border-default bg-white p-2.5 shadow-sm transition-shadow active:cursor-grabbing',
-                  dragging?.id === jd.id ? 'opacity-50 shadow-md ring-1 ring-brand-gold/40' : 'hover:shadow-md'
-                )}
-              >
+                  dragging?.id === jd.id ? 'opacity-50 shadow-md ring-1 ring-brand-gold/40' : 'hover:shadow-md',
+                )}>
                 <div className="flex items-start gap-1.5">
                   <span className={cn('mt-0.5 h-1.5 w-1.5 rounded-full shrink-0', STATUS_DOT[jd.status] ?? 'bg-gray-400')} />
                   <div className="min-w-0">
-                    <div className="truncate text-[10.5px] font-semibold text-text-primary">{jd.jobTitle || 'Untitled'}</div>
-                    {jd.orgUnit && <div className="text-[9px] text-text-muted truncate">{jd.orgUnit}</div>}
+                    <div className="line-clamp-2 text-[10.5px] font-semibold leading-[1.2] text-text-primary">
+                      {jd.jobTitle || 'Untitled'}
+                    </div>
+                    {jd.jobCode && (
+                      <div className="mt-0.5 truncate font-mono text-[8.5px] text-brand-gold">{jd.jobCode}</div>
+                    )}
+                    {jd.orgUnit && <div className="truncate text-[9px] text-text-muted">{jd.orgUnit}</div>}
                   </div>
                 </div>
               </div>
@@ -296,97 +375,130 @@ export function ArchitectureMatrix({
       </div>
 
       {/* ── Matrix ──────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-border-default bg-white px-5 py-3 shrink-0">
+        <div className="flex shrink-0 items-center justify-between border-b border-border-default bg-white px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="text-xs font-semibold text-text-primary">
-              {families.length} Job {families.length === 1 ? 'Family' : 'Families'}
+              {families.length} Job {families.length === 1 ? 'Family' : 'Families'} · 25 levels
             </div>
             {error && (
-              <div className="text-[10px] text-danger bg-danger-bg border border-danger/30 rounded px-2 py-1">{error}</div>
+              <div className="rounded border border-danger/30 bg-danger-bg px-2 py-1 text-[10px] text-danger">{error}</div>
+            )}
+            {dragging && (
+              <div className="rounded bg-brand-gold-light px-2 py-1 text-[10px] font-medium text-brand-gold">
+                Drop &quot;{dragging.jobTitle}&quot; into any cell
+              </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setShowNewFamily(true)}
-            className="rounded-md bg-surface-nav px-3 py-1.5 text-xs font-semibold text-white"
-          >
-            + New Family
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAllGrades(!showAllGrades)}
+              className={cn(
+                'rounded-full border px-3 py-1 text-[10px] font-medium transition-colors',
+                showAllGrades
+                  ? 'border-brand-gold bg-brand-gold/10 text-brand-gold'
+                  : 'border-border-default bg-white text-text-muted hover:border-brand-gold',
+              )}
+              title={showAllGrades ? 'Click to show only used grades + buffer' : 'Click to show all grades 6-30'}
+            >
+              {showAllGrades ? 'Showing all grades 6–30' : `Showing ${visibleGradeList.length} grades (in use)`}
+            </button>
+            <span className="text-[10px] text-text-muted">
+              {colWidth}px / col
+            </span>
+            <button type="button" onClick={() => setShowNewFamily(true)}
+              className="rounded-md bg-surface-nav px-3 py-1.5 text-xs font-semibold text-white">
+              + New Family
+            </button>
+          </div>
         </div>
 
         {families.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
               <div className="mb-3 text-4xl">⊞</div>
               <div className="text-sm font-semibold text-text-primary">No job families yet</div>
               <div className="mb-5 mt-1 text-xs text-text-muted">
-                Create job families (e.g. Technology, Sales, HR) then drag JDs onto the grade level matrix.
+                Create job families (e.g. Technology, HR C&amp;B, Sales) then drag JDs onto the level grid.
               </div>
-              <button
-                type="button"
-                onClick={() => setShowNewFamily(true)}
-                className="rounded-md bg-surface-nav px-5 py-2 text-xs font-semibold text-white"
-              >
+              <button type="button" onClick={() => setShowNewFamily(true)}
+                className="rounded-md bg-surface-nav px-5 py-2 text-xs font-semibold text-white">
                 + Create First Family
               </button>
             </div>
           </div>
         ) : (
-          /* Scrollable matrix */
-          <div className="flex-1 overflow-auto p-4">
-            {/* Level header row */}
-            <div className="flex gap-1 mb-1 pl-[140px]">
-              {LEVELS.map((l) => (
-                <div key={l} className="w-[100px] shrink-0 text-center text-[9px] font-bold uppercase tracking-wide text-text-muted py-1">
-                  L{l}
-                </div>
+          /* Transposed matrix: families on top (cols), levels down the side (rows) */
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* Axiomera band legend */}
+            <div className="flex shrink-0 items-center gap-2 border-b border-border-default bg-surface-page/50 px-5 py-2 text-[10px]">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-text-muted">Bands</span>
+              {AXIOMERA_BANDS.map((b) => (
+                <span
+                  key={b.letter}
+                  className="flex items-center gap-1 rounded-full border border-border-default/50 bg-white px-2 py-0.5"
+                  title={b.description}
+                >
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: b.color }} />
+                  <span className="font-mono font-semibold" style={{ color: b.color }}>
+                    {b.letter}1–{b.letter}5
+                  </span>
+                  <span className="text-text-muted">·</span>
+                  <span className="text-text-secondary">{b.label}</span>
+                  <span className="text-text-muted">({b.gradeMin}–{b.gradeMax})</span>
+                </span>
               ))}
             </div>
-
-            {/* Family rows */}
-            <div className="space-y-2">
+            <div className="flex-1 overflow-auto">
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: `${headerWidth}px repeat(${families.length}, ${colWidth}px)`,
+                gridAutoRows: '76px',
+              }}>
+              {/* ── Header row: corner + family columns ──────────── */}
+              <div className="sticky top-0 left-0 z-30 border-b border-r border-border-default bg-surface-page" />
               {families.map((family) => (
-                <div key={family.id} className="flex items-stretch gap-1">
-                  {/* Family label */}
-                  <div
-                    className="w-[136px] shrink-0 rounded-lg px-3 py-2 mr-1"
-                    style={{ background: family.color + '18', borderLeft: `3px solid ${family.color}` }}
-                  >
-                    <div className="text-[11px] font-bold text-text-primary truncate">{family.name}</div>
-                    {family.description && (
-                      <div className="text-[9px] text-text-muted mt-0.5 line-clamp-2">{family.description}</div>
-                    )}
-                    <div className="mt-1 text-[9px]" style={{ color: family.color }}>
-                      {family.slots.length} roles
-                    </div>
+                <div key={family.id}
+                  className="sticky top-0 z-20 flex flex-col items-stretch justify-center border-b border-r border-border-default bg-white px-2 py-2 text-center"
+                  style={{ borderTop: `3px solid ${family.color}` }}>
+                  <div className="line-clamp-2 text-[12px] font-bold leading-[1.15] text-text-primary"
+                    title={family.name}>
+                    {family.name}
                   </div>
-
-                  {/* Level cells */}
-                  {LEVELS.map((level) => {
-                    const cellSlots = family.slots.filter((s) => s.level === level);
-                    return (
-                      <div key={level} className="w-[100px] shrink-0">
-                        <MatrixCell
-                          family={family}
-                          level={level}
-                          slots={cellSlots}
-                          onPlace={handlePlace}
-                          onRemove={handleRemove}
-                          dragging={dragging}
-                        />
-                      </div>
-                    );
-                  })}
+                  <div className="mt-1 flex items-center justify-center gap-2 text-[9px]">
+                    <span className="font-mono font-bold" style={{ color: family.color }}>
+                      {abbrevFamily(family.name)}
+                    </span>
+                    <span className="text-text-muted">·</span>
+                    <span style={{ color: family.color }}>{family.slots.length} role{family.slots.length === 1 ? '' : 's'}</span>
+                  </div>
                 </div>
+              ))}
+
+              {/* ── Body rows: level header + cells per family ─── */}
+              {visibleGradeList.map((level) => (
+                <RowFragment key={level}
+                  level={level}
+                  families={families}
+                  slotsIndex={slotsIndex}
+                  onPlace={handlePlace}
+                  onRemove={handleRemove}
+                  dragging={dragging}
+                  compact={compact} />
               ))}
             </div>
 
+            </div>
             {/* Legend */}
-            <div className="mt-6 flex items-center gap-4 text-[9px] text-text-muted">
-              <span>L1 = Entry level · L15 = Executive/C-suite</span>
-              {dragging && <span className="font-semibold text-brand-gold">Drop "{dragging.jobTitle}" onto any empty cell</span>}
+            <div className="flex shrink-0 items-center justify-between gap-4 border-t border-border-default bg-white px-5 py-2 text-[10px] text-text-muted">
+              <span>
+                Axiomera grades 6–30 · A1 entry → E5 executive. Position code = <strong>FAMILY+GRADE+SEQ</strong>
+                (e.g. <code className="font-mono">HRCB1701</code> = HR C&amp;B, grade 17 / C2, slot 1).
+              </span>
+              <span className="font-mono">{families.reduce((a, f) => a + f.slots.length, 0)} placed · {unplaced.length} unplaced</span>
             </div>
           </div>
         )}
@@ -399,60 +511,51 @@ export function ArchitectureMatrix({
             <div className="border-b border-border-default p-5">
               <h3 className="font-semibold text-text-primary">New Job Family</h3>
               <p className="mt-1 text-xs text-text-muted">
-                Job families group related roles across levels (e.g. Technology, Finance, HR, Sales).
+                Job families group related roles across levels. Multi-word names work best — abbreviation auto-derives initials (e.g. &quot;HR Compensation &amp; Benefits&quot; → <code className="font-mono">HRCB</code>).
               </p>
             </div>
-            <div className="p-5 space-y-3">
+            <div className="space-y-3 p-5">
               <div>
-                <label className="mb-1 block text-xs font-semibold text-text-primary">Family Name *</label>
-                <input
-                  type="text"
-                  value={familyName}
+                <label className="mb-1 block text-xs font-semibold text-text-primary">Family name *</label>
+                <input type="text" value={familyName}
                   onChange={(e) => setFamilyName(e.target.value)}
-                  placeholder="e.g. Technology, Finance, Operations…"
+                  placeholder="e.g. HR Compensation & Benefits"
                   className="w-full rounded-lg border border-border-default bg-surface-page px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
-                  autoFocus
-                />
+                  autoFocus />
+                {familyName.trim() && (
+                  <div className="mt-1 text-[10px] text-text-muted">
+                    Abbreviation: <span className="font-mono font-bold text-brand-gold">{abbrevFamily(familyName.trim())}</span> ·
+                    sample code: <span className="font-mono">{formatPositionCode(familyName.trim(), 5, 1)}</span>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-text-primary">Description</label>
-                <input
-                  type="text"
-                  value={familyDesc}
+                <input type="text" value={familyDesc}
                   onChange={(e) => setFamilyDesc(e.target.value)}
                   placeholder="Optional description…"
-                  className="w-full rounded-lg border border-border-default bg-surface-page px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40"
-                />
+                  className="w-full rounded-lg border border-border-default bg-surface-page px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold/40" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold text-text-primary">Colour</label>
                 <div className="flex gap-2">
                   {FAMILY_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setFamilyColor(c)}
+                    <button key={c} type="button" onClick={() => setFamilyColor(c)}
                       className={cn('h-6 w-6 rounded-full border-2 transition-transform', familyColor === c ? 'border-text-primary scale-110' : 'border-transparent hover:scale-105')}
-                      style={{ background: c }}
-                    />
+                      style={{ background: c }} />
                   ))}
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-border-default p-4">
-              <button
-                type="button"
-                onClick={() => setShowNewFamily(false)}
-                className="rounded-md border border-border-default px-4 py-1.5 text-xs text-text-secondary"
-              >
+              <button type="button" onClick={() => setShowNewFamily(false)}
+                className="rounded-md border border-border-default px-4 py-1.5 text-xs text-text-secondary">
                 Cancel
               </button>
-              <button
-                type="button"
+              <button type="button"
                 disabled={familyName.trim().length < 2 || loading}
                 onClick={handleCreateFamily}
-                className="inline-flex items-center gap-2 rounded-md bg-brand-gold px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
-              >
+                className="inline-flex items-center gap-2 rounded-md bg-brand-gold px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
                 {loading && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
                 Create Family
               </button>
@@ -461,5 +564,45 @@ export function ArchitectureMatrix({
         </div>
       )}
     </div>
+  );
+}
+
+// Render one row: bold level label + N cells (one per family).
+function RowFragment({
+  level, families, slotsIndex, onPlace, onRemove, dragging, compact,
+}: {
+  level: number;
+  families: JobFamily[];
+  slotsIndex: Map<string, Map<number, JDSlot[]>>;
+  onPlace: (familyId: string, level: number) => void;
+  onRemove: (slotId: string) => void;
+  dragging: UnplacedJD | null;
+  compact: boolean;
+}) {
+  const band = getBand(level);
+  const bandCode = gradeToBandCode(level);
+  return (
+    <>
+      {/* Grade header (sticky left) — Axiomera grade + band code */}
+      <div
+        className="sticky left-0 z-10 flex flex-col items-center justify-center border-b border-r border-border-default bg-surface-page py-1"
+        style={band ? { borderLeft: `3px solid ${band.color}` } : undefined}
+        title={band ? `${band.label} band — grades ${band.gradeMin}-${band.gradeMax}` : undefined}
+      >
+        <div className="font-display text-[13px] font-bold leading-none text-text-primary">{level}</div>
+        <div className="mt-0.5 font-mono text-[9px] font-semibold leading-none" style={{ color: band?.color || '#888' }}>
+          {bandCode}
+        </div>
+      </div>
+      {families.map((family) => {
+        const slots = slotsIndex.get(family.id)?.get(level) || [];
+        return (
+          <MatrixCell key={`${family.id}-${level}`}
+            family={family} level={level} slots={slots}
+            onPlace={onPlace} onRemove={onRemove} dragging={dragging}
+            compact={compact} />
+        );
+      })}
+    </>
   );
 }

@@ -24,7 +24,7 @@ const FORMATS: FormatDef[] = [
   { id: 'docx', label: 'Word',        ext: '.docx', icon: 'W',   group: 'data',   mode: 'server',       description: 'Microsoft Word document (.docx)' },
   { id: 'xlsx', label: 'Excel',       ext: '.xlsx', icon: 'X',   group: 'data',   mode: 'server',       description: 'All fields + evaluation in one workbook' },
   // Visual — full Axiomera-style document
-  { id: 'pdf',  label: 'PDF',         ext: '.pdf',  icon: '📑',  group: 'visual', mode: 'print-page',   description: 'Full Quadrance document layout → print to PDF' },
+  { id: 'pdf',  label: 'PDF',         ext: '.pdf',  icon: '📑',  group: 'visual', mode: 'print-page',   description: 'Full document layout → print to PDF' },
   { id: 'png',  label: 'PNG',         ext: '.png',  icon: '🖼',   group: 'visual', mode: 'image-page',   description: 'Full JD document as high-res PNG image' },
   { id: 'jpg',  label: 'JPG',         ext: '.jpg',  icon: '📷',  group: 'visual', mode: 'image-page',   description: 'Full JD document as compressed JPG' },
   // Audio
@@ -39,7 +39,7 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 const GROUP_TIPS: Record<string, string> = {
-  visual: 'Exports the complete JD including all sections and evaluation in Quadrance brand layout',
+  visual: 'Exports the complete JD including all sections and evaluation in a clean document layout',
 };
 
 export function ExportModal() {
@@ -124,7 +124,7 @@ export function ExportModal() {
           <div>
             <h2 className="mb-[3px] font-display text-xl font-bold text-text-primary">Export JD</h2>
             <p className="text-xs text-text-secondary">
-              Complete document · all sections · Quadrance brand layout · audit trail auto-recorded
+              Complete document · all sections · clean layout · audit trail auto-recorded
             </p>
           </div>
           <button
@@ -185,7 +185,7 @@ export function ExportModal() {
           {/* Selected format hint */}
           <div className="mb-3 rounded-md bg-surface-page border border-border-default px-3 py-2 text-[11px] text-text-secondary">
             {fmt.mode === 'print-page' && (
-              <>📑 Opens a beautiful Quadrance-branded document in a new tab. Use <strong>Ctrl+P / ⌘+P → Save as PDF</strong> to download.</>
+              <>📑 Opens a clean, document-style preview in a new tab. Use <strong>Ctrl+P / ⌘+P → Save as PDF</strong> to download.</>
             )}
             {fmt.mode === 'image-page' && (
               <>🖼 Opens the full JD document in a new tab. Click <strong>"Save as {fmt.ext.toUpperCase().replace('.', '')}"</strong> to download a complete, high-res image of all sections.</>

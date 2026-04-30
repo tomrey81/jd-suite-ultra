@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { JobDescription, Template, User } from '@jd-suite/db';
 import { cn } from '@/lib/utils';
+import { HubNav } from '@/components/layout/hub-nav';
 
 type JDWithRelations = JobDescription & {
   owner: Pick<User, 'name' | 'email'>;
@@ -147,6 +148,10 @@ export function WorkspaceView({ jds: initialJds, templates }: WorkspaceViewProps
   );
 
   return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-border-default bg-surface-page py-3">
+        <HubNav />
+      </div>
     <div className="flex flex-1 overflow-hidden">
       {/* ── Folder sidebar ── */}
       <div className="flex w-[170px] shrink-0 flex-col border-r border-border-default bg-white">
@@ -362,6 +367,7 @@ export function WorkspaceView({ jds: initialJds, templates }: WorkspaceViewProps
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 }

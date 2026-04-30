@@ -1,0 +1,30 @@
+language,masculine,feminine,neutral,severity_if_singular,notes
+pl,specjalista,specjalistka,osoba na stanowisku specjalisty,medium,common pair (pracuj.pl)
+pl,kierownik,kierowniczka,osoba kierująca,medium,common pair
+pl,dyrektor,dyrektorka,osoba zarządzająca,medium,common pair
+pl,prezes,prezeska,osoba pełniąca funkcję prezesa,medium,common pair
+pl,konsultant,konsultantka,osoba konsultująca,medium,common pair
+pl,analityk,analityczka,osoba analizująca,medium,common pair
+pl,programista,programistka,osoba programująca,medium,common pair
+pl,inżynier,inżynierka,osoba inżynierska,medium,common pair
+pl,prawnik,prawniczka,osoba pełniąca rolę prawnika,medium,common pair
+pl,nauczyciel,nauczycielka,osoba nauczająca,medium,common pair
+pl,doradca,doradczyni,osoba doradzająca,medium,common pair
+pl,redaktor,redaktorka,osoba redagująca,medium,common pair
+pl,księgowy,księgowa,osoba prowadząca księgowość,medium,common pair
+pl,manager,managerka,osoba zarządzająca,medium,anglicism
+pl,manager produktu,managerka produktu,osoba zarządzająca produktem,medium,product manager pair
+pl,lider,liderka,osoba lidera,medium,common pair
+pl,projektant,projektantka,osoba projektująca,medium,common pair
+pl,architekt,architektka,osoba architekta,medium,common pair
+pl,pracownik,pracownica,osoba zatrudniona,low,common pair
+pl,asystent,asystentka,osoba asystenta,medium,common pair
+pl,koordynator,koordynatorka,osoba koordynująca,medium,common pair
+pl,handlowiec,handlowczyni,osoba handlowca,medium,common pair
+pl,sprzedawca,sprzedawczyni,osoba sprzedająca,medium,common pair
+pl,monter,monterka,osoba montująca,medium,Iceland 2024 §11 — elektromonter trap
+pl,elektromonter,elektromonterka,osoba montująca elektrycznie,high,Iceland 2024 §11 trap — verify physical effort claim
+pl,kasjer,kasjerka,osoba kasująca,low,common pair
+pl,recepcjonista,recepcjonistka,osoba recepcji,low,common pair
+pl,specjalista ds. HR,specjalistka ds. HR,osoba pełniąca rolę specjalisty ds. HR,medium,HR pair
+pl,Business Partner,Business Partnerka,osoba pełniąca rolę Business Partnera,medium,HRBP anglicism

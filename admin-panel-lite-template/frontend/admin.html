@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Panel Lite</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+
+  <!-- ================================
+       LOGIN VIEW
+  ================================= -->
+  <section id="view-login" class="view active">
+    <form id="login-form" class="login-card">
+      <h1>Sign in</h1>
+      <p class="muted" style="margin-top:-8px;margin-bottom:8px">Enter your admin password to continue.</p>
+      <label>Password
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="primary">Sign in</button>
+      <p id="login-error" class="error" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <!-- ================================
+       APP SHELL (after login)
+  ================================= -->
+  <section id="view-app" class="view">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">A</div>
+        <div class="brand-name">
+          <b>Admin Lite</b>
+          <span>Control Panel</span>
+        </div>
+      </div>
+
+      <div class="nav-label">Workspace</div>
+      <nav class="nav">
+        <button data-route="dashboard"   class="nav-btn active"><span class="dot"></span>Dashboard</button>
+        <button data-route="settings"    class="nav-btn"><span class="dot"></span>Site content</button>
+        <button data-route="submissions" class="nav-btn"><span class="dot"></span>Submissions</button>
+        <button data-route="history"     class="nav-btn"><span class="dot"></span>History</button>
+      </nav>
+
+      <div class="nav-label">Account</div>
+      <nav class="nav">
+        <button data-route="account" class="nav-btn"><span class="dot"></span>Account &amp; security</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button id="logout-btn" class="logout">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="content">
+
+      <!-- DASHBOARD -->
+      <section id="page-dashboard" class="page active">
+        <header class="page-head">
+          <div>
+            <h2>Dashboard</h2>
+            <p>An overview of the panel's current state and recent admin activity.</p>
+          </div>
+        </header>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Settings keys</div>
+            <div id="stat-keys" class="stat-value">—</div>
+            <div class="stat-sub">Editable on the Site content tab.</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Recent actions</div>
+            <div id="stat-history" class="stat-value">—</div>
+            <div class="stat-sub">Last 200 audit log entries.</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Token version</div>
+            <div id="stat-tv" class="stat-value">—</div>
+            <div class="stat-sub">Bumps invalidate every JWT.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="page-settings" class="page">
+        <header class="page-head">
+          <div>
+            <h2>Site content</h2>
+            <p>
+              Each row is a piece of content your public site reads via
+              <code>/api/admin/public-settings</code>. Mark target elements with
+              <code>data-bind="key.name"</code>. A small allow-list of HTML tags
+              (<code>b · i · em · strong · br · span · a · p</code>) is preserved;
+              everything else is stripped at save time.
+            </p>
+          </div>
+        </header>
+
+        <div class="card">
+          <div id="settings-rows"></div>
+          <div class="row-actions">
+            <button id="add-row" type="button" class="secondary">+ Add row</button>
+            <button id="save-settings" type="button" class="primary">Save changes</button>
+            <span id="settings-status" class="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SUBMISSIONS -->
+      <section id="page-submissions" class="page">
+        <header class="page-head">
+          <div>
+            <h2>Submissions</h2>
+            <p>
+              Reads <code>/api/submissions/list</code> using the server's
+              <code>ADMIN_API_KEY</code>. The key stays in this browser only.
+            </p>
+          </div>
+        </header>
+
+        <div class="card">
+          <div class="api-key-row">
+            <label>Server API key
+              <input id="api-key-input" type="password" placeholder="paste your ADMIN_API_KEY">
+            </label>
+            <button id="load-submissions" type="button" class="primary">Load</button>
+          </div>
+
+          <table class="data-table">
+            <thead>
+              <tr><th>Date</th><th>Name</th><th>Email</th><th>Subject</th><th>Status</th></tr>
+            </thead>
+            <tbody id="submissions-body">
+              <tr><td colspan="5" class="muted">No data loaded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section id="page-history" class="page">
+        <header class="page-head">
+          <div>
+            <h2>Action history</h2>
+            <p>Last 200 admin actions, including the actor's role and IP.</p>
+          </div>
+        </header>
+
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr><th>Time</th><th>Action</th><th>Actor</th><th>Detail</th></tr>
+            </thead>
+            <tbody id="history-body">
+              <tr><td colspan="4" class="muted">No data loaded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ACCOUNT -->
+      <section id="page-account" class="page">
+        <header class="page-head">
+          <div>
+            <h2>Account &amp; security</h2>
+            <p>Change your password and manage active sessions.</p>
+          </div>
+        </header>
+
+        <div class="card">
+          <h3>Change password</h3>
+          <p class="muted">
+            A confirmation email goes to <code>NOTIFICATION_EMAIL</code>; click the link
+            there to apply the change. All existing sessions are invalidated automatically.
+          </p>
+          <form id="pw-form" style="margin-top:16px">
+            <label>Current password<input type="password" name="currentPassword" autocomplete="current-password" required></label>
+            <label>New password (min 8 chars)<input type="password" name="newPassword" autocomplete="new-password" minlength="8" required></label>
+            <button type="submit" class="primary" style="align-self:flex-start">Request change</button>
+            <p id="pw-status" class="status" aria-live="polite"></p>
+          </form>
+        </div>
+
+        <div class="card danger">
+          <h3>Revoke all tokens</h3>
+          <p class="muted">
+            Forces every signed-in admin browser to log in again. Use this if you
+            suspect a token leak or a stolen device.
+          </p>
+          <button id="revoke-btn" class="danger" style="margin-top:12px">Revoke all tokens</button>
+          <p id="revoke-status" class="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+    </main>
+  </section>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

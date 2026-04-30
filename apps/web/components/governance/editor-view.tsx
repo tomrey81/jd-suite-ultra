@@ -5,6 +5,7 @@ import type { LintResult } from '@/lib/lint/score';
 import { wordDiff } from '@/lib/lint/diff';
 import { logEvent } from '@/lib/telemetry/store';
 import { toMarkdown, toJson, toCsv, toPrintableHtml, downloadText, openHtmlInNewWindow } from '@/lib/export/formats';
+import { HypothesisPanel } from '@/components/hypotheses/hypothesis-panel';
 
 function slugify(s: string) {
   return (s || 'jd').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'jd';
@@ -219,7 +220,27 @@ export default function EditorView() {
                 </div>
               </div>
             )}
+
+            {/* Axiomera-style hypothesis test against the rewritten JD */}
+            <div className="mt-6">
+              <HypothesisPanel
+                jdText={result.after.text}
+                language="pl"
+                title="Hypothesis test on rewritten JD"
+              />
+            </div>
           </>
+        )}
+
+        {/* Hypothesis test against draft (before rewrite) — useful for diagnosing what's missing */}
+        {!result && draft.trim().length > 100 && (
+          <div className="mt-6">
+            <HypothesisPanel
+              jdText={draft}
+              language="pl"
+              title="Hypothesis test on current draft"
+            />
+          </div>
         )}
       </div>
     </div>

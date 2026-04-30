@@ -2,12 +2,29 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
 import { db } from '@jd-suite/db';
+import { headers } from 'next/headers';
 import { z } from 'zod';
+import { checkRateLimit } from '@/lib/admin/rate-limit';
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
+
+// Login rate limit: 10 attempts per 15 min per IP. Lifted from
+// admin-panel-lite playbook (loginRateLimiter — max 10 in 15 min).
+async function rateLimitKey(): Promise<string> {
+  try {
+    const h = await headers();
+    return (
+      h.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      h.get('x-real-ip') ||
+      'unknown'
+    );
+  } catch {
+    return 'unknown';
+  }
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -20,6 +37,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
+
+        const ip = await rateLimitKey();
+        const rl = await checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
+        if (!rl.ok) {
+          // Block authorize; NextAuth maps null to a generic error
+          // (timing-stable). The retry-after window is 15 minutes.
+          return null;
+        }
 
         const user = await db.user.findUnique({
           where: { email: parsed.data.email },

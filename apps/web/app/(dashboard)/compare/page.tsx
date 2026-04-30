@@ -6,7 +6,7 @@ import type { TemplateSection } from '@jd-suite/types';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'JD Compare — Quadrance',
+  title: 'JD Compare',
 };
 
 export default async function ComparePage({

@@ -7,7 +7,7 @@ export default function GuidePage() {
         {/* Hero */}
         <div className="mb-10 rounded-xl border border-border-default bg-white p-8">
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-brand-gold">
-            Quadrance Guide
+            JD Guide
           </div>
           <h1 className="mb-3 font-display text-3xl font-bold leading-tight text-text-primary">
             How to Write a Job Description<br />
@@ -342,7 +342,15 @@ export default function GuidePage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-[10px] leading-relaxed text-text-muted">
-          Quadrance JD Suite | Origometrics Platform | EU Pay Transparency Directive 2023/970
+          JD Suite | EU Pay Transparency Directive 2023/970 | Built by{' '}
+          <a
+            href="https://www.linkedin.com/in/tomaszrey"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-gold hover:underline"
+          >
+            Tomasz Rey
+          </a>
           <br />
           Sources: LinkedIn Talent Solutions, ESCO/European Commission, Michael Armstrong &mdash; Handbook of Reward Management Practice
         </div>

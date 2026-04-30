@@ -132,7 +132,7 @@ export function StudioSoloView() {
       } else if (mode === 'animals' && playing) {
         blob = await renderAnimalSoundToWav(playing, volume);
       } else if (mode === 'instruments') {
-        blob = await renderInstrumentToWav('Quadrance JD Studio', selectedInst, scaleKey, rootKey, { speed, noteDur, vol: volume });
+        blob = await renderInstrumentToWav('JD Studio', selectedInst, scaleKey, rootKey, { speed, noteDur, vol: volume });
       } else {
         setExporting(false);
         return;

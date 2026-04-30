@@ -68,7 +68,7 @@ export default function CompanyPage() {
           <div className="rounded-lg border border-border-default bg-white p-[22px]">
             <h2 className="mb-3.5 font-display text-[0.95rem] font-semibold">Organisation Identity</h2>
             {[
-              { l: 'Company name', k: 'name' as const, ph: 'e.g. HAVI Group' },
+              { l: 'Company name', k: 'name' as const, ph: 'e.g. EUPTD Enterprises' },
               { l: 'Country (HQ)', k: 'country' as const, ph: 'PL / DE / CZ...' },
               { l: 'Industry', k: 'industry' as const, ph: 'e.g. Logistics & Supply Chain' },
               { l: 'Total FTE', k: 'fte' as const, ph: 'e.g. 850' },

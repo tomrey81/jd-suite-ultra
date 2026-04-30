@@ -161,7 +161,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         new Paragraph({
           children: [
             new TextRun({
-              text: 'Quadrance JD Suite | Origometrics Platform | EU Pay Transparency Directive 2023/970',
+              text: 'JD Suite | EU Pay Transparency Directive 2023/970 | Built by Tomasz Rey · linkedin.com/in/tomaszrey',
               italics: true,
               size: 18,
             }),
@@ -192,28 +192,31 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   // ── XLSX ─────────────────────────────────────────────────────────────────────
+  // Uses `exceljs` (maintained, audit-clean) — replaced legacy `xlsx`/sheetjs.
   if (format === 'xlsx') {
     try {
-      const XLSX = await import('xlsx');
-      const rows: any[][] = [['Section', 'Field', 'Value']];
+      const ExcelJS = (await import('exceljs')).default;
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('JD');
+      ws.addRow(['Section', 'Field', 'Value']);
       for (const sec of sections) {
         for (const f of sec.fields) {
-          rows.push([sec.title, f.label, data[f.id] || '']);
+          ws.addRow([sec.title, f.label, data[f.id] || '']);
         }
       }
       if (evalResult) {
         const criteria = (evalResult.criteria as any[]) || [];
-        rows.push([]);
-        rows.push(['Evaluation', 'Criterion', 'Status']);
+        ws.addRow([]);
+        ws.addRow(['Evaluation', 'Criterion', 'Status']);
         for (const c of criteria) {
-          rows.push(['Evaluation', c.criterion || c.name || '', c.status || '']);
+          ws.addRow(['Evaluation', c.criterion || c.name || '', c.status || '']);
         }
       }
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(wb, ws, 'JD');
-      const buf: Uint8Array = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-      return new Response(new Blob([new Uint8Array(buf)]), {
+      // Light header styling
+      ws.getRow(1).font = { bold: true };
+      ws.columns = [{ width: 24 }, { width: 32 }, { width: 60 }];
+      const buf = await wb.xlsx.writeBuffer();
+      return new Response(new Blob([new Uint8Array(buf as ArrayBuffer)]), {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="${fileName}.xlsx"`,
@@ -223,8 +226,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       if (err?.code === 'MODULE_NOT_FOUND' || err?.message?.includes('Cannot find module')) {
         return NextResponse.json(
           {
-            error: 'XLSX export requires the "xlsx" package.',
-            hint: 'Run: pnpm add xlsx --filter web',
+            error: 'XLSX export requires the "exceljs" package.',
+            hint: 'Run: pnpm add exceljs --filter web',
           },
           { status: 501 },
         );
@@ -266,7 +269,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
   lines.push(
     '='.repeat(60),
-    'Quadrance JD Suite | Origometrics Platform | EU Pay Transparency Directive 2023/970',
+    'JD Suite | EU Pay Transparency Directive 2023/970 | Built by Tomasz Rey · linkedin.com/in/tomaszrey',
   );
 
   return new Response(lines.join('\n'), {

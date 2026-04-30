@@ -1,0 +1,46 @@
+language,code_type,pattern_type,pattern,severity,notes,source,version,added_by,added_at
+en,agentic,word,active,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,adventurous,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,aggressive,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,ambitious,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,analytical,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,assertive,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,athletic,medium,Matfield decoder,Matfield,1.0,trey,2026-04-29
+en,agentic,word,autonomous,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,boast,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,challenging,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,competitive,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,confident,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,courageous,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,decisive,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,decide,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,determined,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,dominant,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,driven,low,Matfield decoder,Matfield,1.0,trey,2026-04-29
+en,agentic,word,fearless,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,fight,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,force,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,greedy,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,headstrong,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,hierarchical,medium,Matfield decoder,Matfield,1.0,trey,2026-04-29
+en,agentic,word,hostile,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,impulsive,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,independent,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,individual,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,intellectual,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,leader,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,logic,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,objective,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,opinion,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,outspoken,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,persist,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,principled,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,reckless,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,rockstar,medium,Matfield decoder,Matfield,1.0,trey,2026-04-29
+en,agentic,word,ninja,medium,Matfield decoder,Matfield,1.0,trey,2026-04-29
+en,agentic,word,self-confident,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,self-reliant,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,self-sufficient,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,stubborn,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,superior,low,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29
+en,agentic,word,unreasonable,medium,Gaucher 2011 seed,Gaucher2011,1.0,trey,2026-04-29

@@ -35,15 +35,25 @@ model Organisation {
 // ── User ─────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  name          String?
-  passwordHash  String?
-  emailVerified DateTime?
-  image         String?
-  lastLoginAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  email           String    @unique
+  name            String?
+  firstName       String?
+  lastName        String?
+  country         String?   // ISO-2 code, e.g. "PL"
+  jobFunction     String?   // free text, e.g. "Total Rewards"
+  dataConsentAt   DateTime? // GDPR / data processing acceptance
+  marketingOptIn    Boolean   @default(false)
+  newsletterOptIn   Boolean   @default(false)
+  tosAcceptedAt     DateTime?
+  privacyAcceptedAt DateTime?
+  isPlatformAdmin Boolean   @default(false) // global super-admin (you)
+  passwordHash    String?
+  emailVerified   DateTime?
+  image           String?
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   memberships      Membership[]
   ownedJDs         JobDescription[] @relation("JDOwner")
@@ -57,8 +67,126 @@ model User {
   evalResults      EvalResult[]
   accounts         Account[]
   sessions         Session[]
+  accessCodeUses   AccessCodeUse[]
+  authTokens       AuthToken[]
 
   @@map("users")
+}
+
+// Single table for password-reset and magic-link tokens.
+// Raw token never stored — only SHA-256 hash. One-time-use via usedAt.
+model AuthToken {
+  id         String    @id
+  kind       String    // 'reset' | 'magic'
+  tokenHash  String    @unique
+  email      String
+  userId     String?
+  expiresAt  DateTime
+  usedAt     DateTime?
+  issuedIp   String?
+  createdAt  DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([kind])
+  @@index([email])
+  @@index([expiresAt])
+  @@map("auth_tokens")
+}
+
+// ── Access Codes (rotatable invitation codes) ────────────────────────────────
+
+model AccessCode {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  label       String?   // e.g. "Beta-Wave-1", "Conference-Lisbon"
+  maxUses     Int?      // null = unlimited
+  usesCount   Int       @default(0)
+  expiresAt   DateTime?
+  active      Boolean   @default(true)
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  uses AccessCodeUse[]
+
+  @@index([code])
+  @@map("access_codes")
+}
+
+// ── JD Checkout / Check-in (tamper detection) ──────────────────────────────
+//
+// When an admin or user "checks out" a JD for editing or external review,
+// we snapshot a SHA-256 hash of the JD content. On check-in we recompute
+// the hash and compare; mismatch → tamperFlag = true, requires admin review.
+
+enum JDCheckoutStatus {
+  CHECKED_OUT
+  CHECKED_IN
+  ABANDONED
+}
+
+model JDCheckout {
+  id             String           @id @default(uuid())
+  jdId           String
+  actorId        String?
+  hashAlgo       String           @default("sha256")
+  checkoutHash   String           // hash at checkout time
+  checkinHash    String?          // hash at checkin time
+  snapshot       Json             // full data snapshot at checkout
+  status         JDCheckoutStatus @default(CHECKED_OUT)
+  tamperFlag     Boolean          @default(false)
+  checkedOutAt   DateTime         @default(now())
+  checkedInAt    DateTime?
+  note           String?
+
+  @@index([jdId])
+  @@index([status])
+  @@map("jd_checkouts")
+}
+
+// ── Admin (panel-level) audit log ──────────────────────────────────────────
+// Separate from JDVersion (which logs JD content edits). This logs panel
+// actions: user role changes, org renames, code rotations, etc.
+
+model AdminAuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  actorRole String   @default("admin")
+  action    String   // e.g. "user_role_changed", "access_code_created"
+  detail    Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("admin_audit_log")
+}
+
+// ── Rate limit (cross-instance bucket) ─────────────────────────────────────
+// Used by login + admin write endpoints to enforce limits across all
+// serverless instances (in-memory was per-instance only). Bucket key
+// is e.g. `login:1.2.3.4`. resetAt = first request time + window.
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+  @@map("rate_limit_buckets")
+}
+
+model AccessCodeUse {
+  id           String     @id @default(uuid())
+  accessCodeId String
+  userId       String
+  usedAt       DateTime   @default(now())
+
+  accessCode AccessCode @relation(fields: [accessCodeId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([accessCodeId, userId])
+  @@map("access_code_uses")
 }
 
 // ── Auth.js Models ───────────────────────────────────────────────────────────
@@ -435,6 +563,184 @@ model JobFamily {
 
   @@index([orgId])
   @@map("job_families")
+}
+
+// ── PMOA (Process Mapping & Org Architecture) ───────────────────────────────
+
+model PmoaDocument {
+  id              String   @id
+  orgId           String
+  uploaderId      String?
+  name            String
+  mime            String?
+  sizeBytes       Int?
+  fingerprint     String?
+  rawText         String?
+  pages           Int?
+  validityFlag    String   @default("recent")
+  validityNote    String?
+  documentOwnerId String?
+  parseStatus     String   @default("parsing")
+  parseError      String?
+  ocrConfidence   Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@index([orgId])
+  @@index([validityFlag])
+  @@map("pmoa_documents")
+}
+
+model PmoaDepartment {
+  id                String   @id
+  orgId             String
+  name              String
+  parentId          String?
+  headPositionId    String?
+  sourceDocumentIds String[] @default([])
+  createdAt         DateTime @default(now())
+
+  @@index([orgId])
+  @@map("pmoa_departments")
+}
+
+model PmoaPosition {
+  id                String   @id
+  orgId             String
+  departmentId      String?
+  name              String
+  positionNumber    String?
+  reportsToId       String?
+  currentHolderName String?
+  vacancy           Boolean  @default(false)
+  spanOfControl     Int      @default(0)
+  linkedJdId        String?
+  sourceDocumentIds String[] @default([])
+  createdAt         DateTime @default(now())
+
+  @@index([orgId])
+  @@index([reportsToId])
+  @@index([departmentId])
+  @@map("pmoa_positions")
+}
+
+model PmoaAssignment {
+  id               String    @id
+  orgId            String
+  positionId       String
+  personName       String
+  kind             String    @default("permanent")
+  splitAllocations Json?
+  validFrom        DateTime? @db.Date
+  validUntil       DateTime? @db.Date
+  createdAt        DateTime  @default(now())
+
+  @@index([positionId])
+  @@map("pmoa_assignments")
+}
+
+model PmoaProcess {
+  id                String   @id
+  orgId             String
+  name              String
+  description       String?
+  ownerPositionId   String?
+  validityFlag      String   @default("recent")
+  sourceDocumentIds String[] @default([])
+  bpmn              Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now())
+
+  @@index([orgId])
+  @@map("pmoa_processes")
+}
+
+model PmoaProcessStep {
+  id               String   @id
+  processId        String
+  stepOrder        Int      @default(0)
+  name             String
+  kind             String   @default("task")
+  actorPositionId  String?
+  actorRoleName    String?
+  slaDescription   String?
+  sourceDocumentId String?
+  sourcePage       Int?
+  outgoing         Json?    // [{ targetStepId, label }] — supports branches
+  createdAt        DateTime @default(now())
+
+  @@index([processId])
+  @@map("pmoa_process_steps")
+}
+
+model PmoaRasciCell {
+  id             String   @id
+  stepId         String
+  positionId     String?
+  roleName       String?
+  letter         String
+  manualOverride Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([stepId])
+  @@map("pmoa_rasci_cells")
+}
+
+model PmoaIssue {
+  id              String   @id
+  orgId           String
+  severity        String
+  kind            String
+  title           String
+  rationale       String?
+  suggestedAction String?
+  affectedNodeIds Json?
+  status          String   @default("open")
+  statusReason    String?
+  assigneeId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@index([orgId])
+  @@index([status])
+  @@map("pmoa_issues")
+}
+
+// ── EUPTD Readiness Self-Assessment ─────────────────────────────────────────
+
+model EuptdReadinessResponse {
+  id             String    @id
+  orgId          String
+  itemId         String
+  answer         String    // 'yes' | 'partial' | 'no' | 'na'
+  note           String?
+  answeredById   String?
+  assignedToId   String?
+  reviewBy       DateTime?
+  answeredAt     DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+
+  @@unique([orgId, itemId])
+  @@index([orgId])
+  @@index([assignedToId])
+  @@map("euptd_readiness_responses")
+}
+
+// ── Photos table (legacy / unrelated app sharing this DB; preserved here so prisma db push doesn't drop it)
+model Photo {
+  id            String    @id
+  url           String?
+  author        String?
+  tags          Json?
+  timestamp     String?
+  frame_style   String?
+  reactions     Json?
+  comments      Json?
+  hidden        Boolean?
+  drive_file_id String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@map("photos")
 }
 
 model JobArchitectureSlot {

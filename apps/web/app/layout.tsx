@@ -18,7 +18,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'JD Suite | Quadrance',
+  title: 'JD Suite',
   description:
     'Production-grade job description management platform. Create, analyse, evaluate, and export JDs aligned to EU Pay Transparency Directive 2023/970.',
   robots: 'noindex, nofollow',

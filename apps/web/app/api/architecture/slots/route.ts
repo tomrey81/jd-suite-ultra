@@ -3,10 +3,13 @@ import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 import { z } from 'zod';
 
+// Axiomera grade scheme: 6–30 (Bands A1–E5, Tabela 9 in WP).
+// We accept 1–30 for backward compatibility with the legacy 1–25 UI; clients
+// should prefer 6–30 for Axiomera-aligned grading.
 const placeSchema = z.object({
   familyId: z.string().min(1),
   jdId: z.string().min(1),
-  level: z.number().int().min(1).max(20),
+  level: z.number().int().min(1).max(30),
   note: z.string().max(500).optional(),
 });
 

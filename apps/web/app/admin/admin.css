@@ -1,0 +1,249 @@
+/* ============================================================
+   JD Suite — Admin Panel
+   Editorial neutral aesthetic. Token philosophy adapted from
+   admin-panel-lite (variable names preserved). Brand: cream /
+   black / gold (Playfair + DM Sans, already loaded by root).
+   ============================================================ */
+
+.admin-root {
+  --action: #8A7560;
+  --action-hover: #6F5D4C;
+  --action-soft: #F4ECDF;
+
+  --danger: #9B2318;
+  --success: #1E7F3C;
+  --warn: #A0630B;
+  --info: #1B5E8F;
+
+  --paper: #FAF7F2;
+  --paper-2: #F1ECE3;
+  --bg: #FAF7F2;
+  --card: #FFFFFF;
+  --hair: #E6E2D8;
+  --hair-strong: #D6D2C7;
+  --hair-soft: #ECE8DE;
+
+  --ink-1: #17160F;
+  --ink-2: #2F2D23;
+  --ink-3: #55524A;
+  --ink-4: #7A7670;
+  --ink-5: #A29E94;
+  --ink-6: #C7C4BC;
+
+  --ok-bg: #E8F5EC;
+  --warn-bg: #FBF1DD;
+  --err-bg: #FBE7E2;
+  --info-bg: #E6F0F8;
+
+  --font: var(--font-body, "DM Sans", -apple-system, system-ui, sans-serif);
+  --font-display: var(--font-display, "Playfair Display", Georgia, serif);
+  --font-mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --fs-3xs: 10px; --fs-2xs: 11px; --fs-xs: 12px; --fs-sm: 13px;
+  --fs-base: 14px; --fs-md: 15px; --fs-lg: 18px; --fs-xl: 22px;
+  --fs-2xl: 28px;
+
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px;
+  --s6: 24px; --s7: 32px; --s8: 40px;
+
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 999px;
+
+  --sh-1: 0 1px 0 rgba(23, 22, 15, 0.03);
+  --sh-2: 0 1px 2px rgba(23, 22, 15, 0.04), 0 4px 12px rgba(23, 22, 15, 0.04);
+
+  --sb-w: 240px;
+  --tb-h: 58px;
+
+  background: var(--bg);
+  color: var(--ink-1);
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sb-w) 1fr;
+}
+
+.admin-root *, .admin-root *::before, .admin-root *::after {
+  box-sizing: border-box;
+}
+
+/* Sidebar */
+.admin-sidebar {
+  background: var(--card);
+  border-right: 1px solid var(--hair);
+  padding: var(--s6) var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.admin-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--hair);
+}
+.admin-brand b {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.admin-brand span {
+  font-size: var(--fs-3xs);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--action);
+}
+.admin-nav { display: flex; flex-direction: column; gap: 2px; }
+.admin-nav a {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+  transition: background var(--dur);
+}
+.admin-nav a:hover { background: var(--paper-2); color: var(--ink-1); }
+.admin-nav a.active { background: var(--action-soft); color: var(--ink-1); font-weight: 500; }
+.admin-nav a span.badge {
+  margin-left: auto; font-size: var(--fs-3xs); padding: 1px 6px;
+  border-radius: var(--r-full); background: var(--ink-6); color: var(--card);
+}
+
+.admin-side-foot {
+  margin-top: auto; padding-top: var(--s4);
+  border-top: 1px solid var(--hair);
+  display: flex; flex-direction: column; gap: var(--s2);
+  font-size: var(--fs-2xs); color: var(--ink-4);
+}
+
+/* Main */
+.admin-main { padding: var(--s7) var(--s8); max-width: 1180px; }
+.admin-page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--s4);
+  margin-bottom: var(--s6); padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--hair);
+}
+.admin-page-head h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-2xl);
+  letter-spacing: -0.01em;
+}
+.admin-page-head p { color: var(--ink-3); font-size: var(--fs-sm); margin-top: 4px; }
+
+/* Stats */
+.admin-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--s4); margin-bottom: var(--s6);
+}
+.admin-stat {
+  background: var(--card); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: var(--s5);
+}
+.admin-stat .label {
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--ink-4);
+}
+.admin-stat .value {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl); font-weight: 600; margin-top: var(--s2);
+  color: var(--ink-1);
+}
+.admin-stat .delta { font-size: var(--fs-2xs); color: var(--ink-4); margin-top: 4px; }
+
+/* Cards */
+.admin-card {
+  background: var(--card); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: var(--s6);
+  margin-bottom: var(--s5);
+}
+.admin-card h2 {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg); font-weight: 600;
+  margin-bottom: var(--s4);
+}
+
+/* Tables */
+.admin-table {
+  width: 100%; border-collapse: collapse; font-size: var(--fs-sm);
+}
+.admin-table th {
+  text-align: left; padding: var(--s3) var(--s4);
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--ink-4); font-weight: 600;
+  border-bottom: 1px solid var(--hair);
+  background: var(--paper);
+}
+.admin-table td {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--hair-soft);
+  vertical-align: middle;
+}
+.admin-table tr:hover td { background: var(--paper); }
+.admin-table tr:last-child td { border-bottom: none; }
+
+/* Buttons */
+.admin-btn {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 500;
+  border: 1px solid var(--hair-strong); background: var(--card);
+  color: var(--ink-1); border-radius: var(--r-sm);
+  cursor: pointer; transition: all var(--dur);
+  text-decoration: none;
+}
+.admin-btn:hover { border-color: var(--ink-3); }
+.admin-btn.primary { background: var(--ink-1); color: var(--card); border-color: var(--ink-1); }
+.admin-btn.primary:hover { background: var(--ink-2); }
+.admin-btn.action { background: var(--action); color: var(--card); border-color: var(--action); }
+.admin-btn.action:hover { background: var(--action-hover); border-color: var(--action-hover); }
+.admin-btn.danger { color: var(--danger); border-color: var(--danger); }
+.admin-btn.danger:hover { background: var(--err-bg); }
+.admin-btn.sm { padding: 4px var(--s3); font-size: var(--fs-2xs); }
+.admin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Pills / badges */
+.admin-pill {
+  display: inline-block; padding: 2px var(--s3);
+  font-size: var(--fs-3xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  border-radius: var(--r-full);
+}
+.admin-pill.ok { background: var(--ok-bg); color: var(--success); }
+.admin-pill.warn { background: var(--warn-bg); color: var(--warn); }
+.admin-pill.err { background: var(--err-bg); color: var(--danger); }
+.admin-pill.info { background: var(--info-bg); color: var(--info); }
+.admin-pill.muted { background: var(--paper-2); color: var(--ink-4); }
+
+/* Form */
+.admin-form { display: flex; flex-direction: column; gap: var(--s4); max-width: 480px; }
+.admin-form label { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); color: var(--ink-2); font-weight: 500; }
+.admin-form input, .admin-form select, .admin-form textarea {
+  font-family: inherit; font-size: var(--fs-sm);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--hair-strong); border-radius: var(--r-sm);
+  background: var(--card); color: var(--ink-1);
+  outline: none;
+}
+.admin-form input:focus, .admin-form select:focus, .admin-form textarea:focus {
+  border-color: var(--action);
+}
+.admin-form .help { font-size: var(--fs-2xs); color: var(--ink-4); }
+
+/* Empty state */
+.admin-empty {
+  text-align: center; padding: var(--s8) var(--s6);
+  color: var(--ink-4); font-size: var(--fs-sm);
+}
+
+/* Hash display */
+.admin-hash { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--ink-3); }
+.admin-hash.tamper { color: var(--danger); font-weight: 600; }

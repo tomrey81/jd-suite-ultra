@@ -1,5 +1,6 @@
-import StudioEnsembleView from '@/components/studio/studio-ensemble-view';
+import { redirect } from 'next/navigation';
 
-export default function StudioEnsemblePage() {
-  return <StudioEnsembleView />;
+export default function StudioEnsembleRedirect() {
+  // Ensemble is now part of the unified Sonificator — redirect to /studio.
+  redirect('/studio');
 }

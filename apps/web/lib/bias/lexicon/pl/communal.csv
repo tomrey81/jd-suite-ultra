@@ -1,0 +1,20 @@
+language,code_type,pattern_type,pattern,severity,notes,source,version,added_by,added_at
+pl,communal,regex,\b(współprac\w*|współpracown\w*)\b,low,cooperate stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(zespołow\w*|zespół\w*|zespole)\b,low,team stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(relacyjn\w*|relacj\w*)\b,low,relational/relations stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(empati\w*|empat[yi]czn\w*)\b,low,empathy stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(cierpliw\w*|cierpliwoś\w*)\b,low,patience stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(wspiera\w+|wsparci\w*|wspaarci\w*)\b,low,support stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(troskliw\w*|troszcz\w+|troska)\b,low,caring stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(opiekuń\w*|opiek\w+)\b,low,caring/parental stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(uważ\w+|uważnoś\w*)\b,low,attentive stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(życzliw\w*|życzliwoś\w*)\b,low,kind stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(uprzejm\w*|grzeczn\w*)\b,low,polite stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(wyrozumiał\w*|wyrozumiałoś\w*)\b,low,understanding stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(serdeczn\w*|serdeczność)\b,low,warm stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(komunikatywn\w*|komunikacj\w*)\b,low,communicative stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(otwartoś\w+|otwart\w+ na)\b,low,openness phrase,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(słuch\w+|wysłuchać|wysłuchiw\w*)\b,low,listening stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(razem|wspólnie)\b,low,together adverbs,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(pomocn\w+|pomag\w+|pomoc\w*)\b,low,helpful stem,internal,1.0,trey,2026-04-29
+pl,communal,regex,\b(zaangażowan\w*|zaangażowani\w*)\b,low,engaged stem,internal,1.0,trey,2026-04-29
