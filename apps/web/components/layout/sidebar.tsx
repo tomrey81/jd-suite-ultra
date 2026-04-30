@@ -100,7 +100,7 @@ const GROUPS: Group[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ compact = false }: { compact?: boolean } = {}) {
   const pathname = usePathname();
 
   const initialOpen = Object.fromEntries(
@@ -115,6 +115,56 @@ export function Sidebar() {
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
 
   const toggleGroup = (id: string) => setOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // Icon-only compact mode (Notion-style)
+  if (compact) {
+    // Flatten items, keep first-of-group as visual anchor
+    const flat: { href: string; icon: string; label: string }[] = [];
+    for (const g of GROUPS) {
+      for (const it of g.items) flat.push(it);
+    }
+    return (
+      <aside className="flex h-full w-[56px] shrink-0 flex-col items-center bg-surface-nav overflow-y-auto py-3">
+        <Link href="/" className="mb-3 block" title="JD Suite">
+          <span className="font-display text-[10px] tracking-[0.2em] text-text-on-dark/80">JD</span>
+        </Link>
+        <div className="mx-auto h-px w-8 bg-white/[0.06]" />
+        <nav className="mt-2 flex flex-1 flex-col items-center gap-0.5 overflow-y-auto">
+          {flat.map(({ href, icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={label}
+                aria-label={label}
+                className={cn(
+                  'flex h-9 w-9 items-center justify-center rounded-md text-[13px] transition-colors',
+                  active
+                    ? 'bg-white/[0.08] text-brand-gold'
+                    : 'text-white/35 hover:bg-white/[0.04] hover:text-white/70',
+                )}
+              >
+                {icon}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="mx-auto h-px w-8 bg-white/[0.06]" />
+        <Link
+          href="/settings"
+          title="Settings"
+          aria-label="Settings"
+          className={cn(
+            'mt-2 flex h-9 w-9 items-center justify-center rounded-md text-[13px] transition-colors',
+            isActive('/settings') ? 'bg-white/[0.08] text-brand-gold' : 'text-white/35 hover:bg-white/[0.04] hover:text-white/70',
+          )}
+        >
+          ⚙
+        </Link>
+      </aside>
+    );
+  }
 
   return (
     <aside className="flex h-full w-[214px] shrink-0 flex-col bg-surface-nav overflow-y-auto">

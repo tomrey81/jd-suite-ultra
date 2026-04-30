@@ -37,25 +37,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [toggle]);
 
+  const fullWidth = 214;
+  const iconWidth = 56;
+  const currentWidth = hydrated && collapsed ? iconWidth : fullWidth;
+
   return (
     <div className="flex flex-1 overflow-hidden relative">
-      {/* Sidebar wrapper — width animates to 0 when collapsed */}
+      {/* Sidebar wrapper — width animates between full + icons-only (Notion-style) */}
       <div
         className="relative shrink-0 overflow-hidden transition-[width] duration-200 ease-out"
-        style={{ width: hydrated && collapsed ? 0 : 214 }}
+        style={{ width: currentWidth }}
       >
-        <Sidebar />
+        <Sidebar compact={hydrated && collapsed} />
       </div>
 
       {/* Toggle button — sits at the boundary, flips direction on state */}
       <button
         type="button"
         onClick={toggle}
-        aria-label={collapsed ? 'Open sidebar' : 'Collapse sidebar'}
-        title={`${collapsed ? 'Open' : 'Collapse'} sidebar (⌘\\)`}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (⌘\\)`}
         className="absolute top-3 z-20 flex h-6 w-6 items-center justify-center rounded-md border border-border-default bg-white text-text-secondary shadow-sm transition-all duration-200 hover:bg-surface-page hover:text-text-primary hover:shadow"
         style={{
-          left: hydrated && collapsed ? 8 : 214 - 12,
+          left: currentWidth - 12,
         }}
       >
         <svg

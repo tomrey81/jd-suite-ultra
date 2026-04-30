@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useJDStore } from '@/hooks/use-jd-store';
 import { buildText } from '@/lib/jd-helpers';
 import { cn } from '@/lib/utils';
+import { LanguageSwitcher } from '@/components/layout/language-switcher';
 
 interface HeaderProps {
   user: {
@@ -39,6 +40,7 @@ export function Header({ user }: HeaderProps) {
       {/* Right: Actions + User */}
       <div className="flex items-center gap-3">
         {isJDEditor && <JDHeaderActions />}
+        <LanguageSwitcher />
         <div className="ml-1 flex items-center gap-2.5 rounded-full bg-white/[0.07] py-1.5 pl-4 pr-1.5">
           <span className="text-[12px] tracking-wide text-text-on-dark/50">
             {user.name || user.email}
