@@ -58,17 +58,35 @@ function getSR(): { new (): SpeechRecognitionInstance } | null {
     null;
 }
 
-/** Krystyna avatar — circular face with construction helmet, pure SVG, mood-driven. */
+/**
+ * Krystyna avatar — warm friendly face under a builder's helmet.
+ *
+ * Design notes:
+ * — Round peach-toned face (not grey), sized so the helmet sits naturally on top
+ * — Big round eyes with pupils + highlight, eyebrows for expression
+ * — Gentle smile that bends per mood (no eerie flat line)
+ * — Helmet has a real brim with shadow, a domed top, and a centred crest stripe
+ * — Cheek blush adds warmth without being childish
+ * — Mood-driven: idle / thinking / listening / error
+ */
 function KrystynaAvatar({ mood = 'idle', size = 36 }: { mood?: Mood; size?: number }) {
-  const eyeY = mood === 'listening' ? 22 : 21;
+  // Mood-driven geometry
+  const browLeft =
+    mood === 'thinking' ? 'M19 24 L25 22.5'
+    : mood === 'error' ? 'M19 23.5 L25 22'
+    : 'M19.5 23 L24.5 22.5';
+  const browRight =
+    mood === 'thinking' ? 'M27 22.5 L33 24'
+    : mood === 'error' ? 'M27 22 L33 23.5'
+    : 'M27.5 22.5 L32.5 23';
   const mouthD =
-    mood === 'thinking'
-      ? 'M22 30 Q26 28 30 30'
-      : mood === 'error'
-      ? 'M22 31 Q26 33 30 31'
-      : mood === 'listening'
-      ? 'M22 30 Q26 32 30 30'
-      : 'M22 30 Q26 31 30 30';
+    mood === 'thinking' ? 'M22.5 33 Q26 32 29.5 33'   // pursed
+    : mood === 'error' ? 'M22.5 33.5 Q26 35 29.5 33.5' // tiny frown
+    : mood === 'listening' ? 'M22 32.5 Q26 35 30 32.5' // open smile
+    : 'M22.5 32.5 Q26 34.5 29.5 32.5';                  // soft smile
+
+  const eyeOpen = mood !== 'thinking';
+
   return (
     <svg
       width={size}
@@ -77,27 +95,106 @@ function KrystynaAvatar({ mood = 'idle', size = 36 }: { mood?: Mood; size?: numb
       className={cn('shrink-0', mood === 'thinking' && 'motion-safe:animate-pulse')}
       aria-label={`Krystyna (${mood})`}
     >
-      {/* helmet base (red/orange) */}
+      <defs>
+        <radialGradient id="krystyna-face" cx="40%" cy="40%" r="65%">
+          <stop offset="0%" stopColor="#FAE2C8" />
+          <stop offset="60%" stopColor="#EFCBA6" />
+          <stop offset="100%" stopColor="#D9A77E" />
+        </radialGradient>
+        <linearGradient id="krystyna-helmet" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#E85B45" />
+          <stop offset="60%" stopColor="#C9382A" />
+          <stop offset="100%" stopColor="#A02619" />
+        </linearGradient>
+        <linearGradient id="krystyna-brim" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#7B1A12" />
+          <stop offset="100%" stopColor="#5A110B" />
+        </linearGradient>
+      </defs>
+
+      {/* ---------- Face ---------- */}
+      {/* Soft drop shadow under chin */}
+      <ellipse cx="26" cy="46" rx="11" ry="1.2" fill="#000" opacity="0.08" />
+      {/* Face circle */}
+      <circle cx="26" cy="32" r="13.5" fill="url(#krystyna-face)" stroke="#A87650" strokeWidth="0.6" />
+      {/* Cheek blush */}
+      <circle cx="18.5" cy="34" r="2.2" fill="#E89A7B" opacity="0.45" />
+      <circle cx="33.5" cy="34" r="2.2" fill="#E89A7B" opacity="0.45" />
+      {/* Eyebrows */}
+      <path d={browLeft} stroke="#3A2418" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      <path d={browRight} stroke="#3A2418" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      {/* Eyes */}
+      {eyeOpen ? (
+        <>
+          {/* whites */}
+          <ellipse cx="22" cy="29.5" rx="2" ry="2.3" fill="#FFFFFF" />
+          <ellipse cx="30" cy="29.5" rx="2" ry="2.3" fill="#FFFFFF" />
+          {/* pupils */}
+          <circle cx="22.2" cy="30" r="1.15" fill="#2A1810" />
+          <circle cx="30.2" cy="30" r="1.15" fill="#2A1810" />
+          {/* highlights */}
+          <circle cx="21.7" cy="29.4" r="0.45" fill="#FFFFFF" />
+          <circle cx="29.7" cy="29.4" r="0.45" fill="#FFFFFF" />
+        </>
+      ) : (
+        // Closed/concentrating eyes — tiny arcs
+        <>
+          <path d="M20 30 Q22 28.5 24 30" stroke="#2A1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+          <path d="M28 30 Q30 28.5 32 30" stroke="#2A1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        </>
+      )}
+      {/* Nose hint */}
+      <path d="M25.5 31.5 Q26 33 26.5 31.5" stroke="#A87650" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.55" />
+      {/* Mouth */}
+      <path d={mouthD} stroke="#3A2418" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+
+      {/* ---------- Helmet ---------- */}
+      {/* Hair peek at sides under helmet (warm brown) */}
+      <path d="M12.5 22 Q12 26 15 28 L15 22 Z" fill="#6B4226" opacity="0.55" />
+      <path d="M39.5 22 Q40 26 37 28 L37 22 Z" fill="#6B4226" opacity="0.55" />
+
+      {/* Helmet brim (sits ON the head, projects forward) */}
       <path
-        d="M8 18 Q8 4 26 4 Q44 4 44 18 L44 22 L8 22 Z"
-        fill="#D14B3D"
-        stroke="#8E2A20"
-        strokeWidth="0.8"
+        d="M5.5 21.5 Q26 17.8 46.5 21.5 L46.5 24.4 Q26 23 5.5 24.4 Z"
+        fill="url(#krystyna-brim)"
       />
-      {/* helmet brim */}
-      <rect x="6" y="20" width="40" height="3.5" rx="1" fill="#8E2A20" />
-      {/* helmet stripe */}
-      <rect x="22" y="6" width="8" height="14" fill="#F4D9A8" />
-      {/* face */}
-      <circle cx="26" cy="32" r="14" fill="#D9D2C8" stroke="#7E7468" strokeWidth="0.8" />
-      {/* eyes */}
-      <circle cx="22" cy={eyeY + 8} r="1.2" fill="#1F1A14" />
-      <circle cx="30" cy={eyeY + 8} r="1.2" fill="#1F1A14" />
-      {/* mouth */}
-      <path d={mouthD} stroke="#1F1A14" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-      {/* listening indicator */}
+
+      {/* Helmet dome */}
+      <path
+        d="M8.5 22 Q8.5 5 26 5 Q43.5 5 43.5 22 Z"
+        fill="url(#krystyna-helmet)"
+      />
+      {/* Dome highlight (soft top-left sheen) */}
+      <path
+        d="M11 18 Q12 9 22 6 Q15 9 13 19 Z"
+        fill="#FFFFFF"
+        opacity="0.18"
+      />
+      {/* Crest stripe — runs front-to-back over the dome */}
+      <path
+        d="M22.5 5.4 Q22.5 14 22 22 L30 22 Q29.5 14 29.5 5.4 Q26 5 22.5 5.4 Z"
+        fill="#F8DDB0"
+      />
+      {/* Crest stripe inner shadow line */}
+      <path
+        d="M26 5.5 L26 22"
+        stroke="#C9A875"
+        strokeWidth="0.4"
+        opacity="0.6"
+      />
+      {/* Brim front line (separates brim from dome) */}
+      <path d="M5.5 21.6 Q26 18 46.5 21.6" stroke="#5A110B" strokeWidth="0.6" fill="none" />
+
+      {/* Listening pulse — small mic dot near helmet */}
       {mood === 'listening' && (
-        <circle cx="44" cy="14" r="3" fill="#D14B3D" className="motion-safe:animate-ping" />
+        <>
+          <circle cx="45" cy="14" r="2.6" fill="#E85B45" />
+          <circle cx="45" cy="14" r="2.6" fill="#E85B45" opacity="0.4" className="motion-safe:animate-ping" />
+        </>
+      )}
+      {/* Error pip */}
+      {mood === 'error' && (
+        <circle cx="45" cy="14" r="2.6" fill="#B23B2C" />
       )}
     </svg>
   );
