@@ -140,14 +140,17 @@ export default function InputJDPage() {
         {/* Header */}
         <div className="mb-1 flex items-center justify-between">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#8A7560]">Step 1 — Input</div>
-            <h1 className="font-display text-2xl font-bold text-text-primary">Input a job description</h1>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-gold">Step 1 — Input</div>
+            <h1 className="mt-1 font-display text-2xl font-bold text-text-primary">Input a job description</h1>
             <p className="mt-1 text-[13px] text-text-secondary">
               Drop one file or many, paste plain text, or fetch from a careers URL.
               JD Suite parses, classifies headings, saves a Draft, and opens it.
             </p>
           </div>
-          <Link href="/jd" className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px]">
+          <Link
+            href="/jd"
+            className="shrink-0 whitespace-nowrap rounded-md border border-border-default bg-white px-3 py-1.5 text-[11px] font-medium text-text-secondary transition-colors hover:border-brand-gold hover:text-brand-gold"
+          >
             ← JD hub
           </Link>
         </div>
@@ -285,11 +288,13 @@ export default function InputJDPage() {
           </div>
         )}
 
-        <div className="mt-6 rounded-md bg-info-bg p-3 text-[11px] leading-relaxed text-info">
-          <strong>What happens next:</strong> Headings like &quot;Purpose / Responsibilities / Skills / Conditions&quot;
-          are auto-routed into JD Suite fields. Anything unrecognised lands in <em>notes</em>. After import,
-          run <Link href="/analyser" className="underline">Lint &amp; analyse</Link> or{' '}
-          <Link href="/v5/bias-check" className="underline">Bias check</Link>, then export an audit report.
+        <div className="mt-6 rounded-md border-l-2 border-brand-gold bg-brand-gold-lighter px-4 py-3 text-[11.5px] leading-relaxed text-text-primary">
+          <strong className="text-brand-gold">What happens next · </strong>
+          Headings like &quot;Purpose / Responsibilities / Skills / Conditions&quot; are auto-routed into JD Suite fields.
+          Anything unrecognised lands in <em>notes</em>. After import, run{' '}
+          <Link href="/analyser" className="text-brand-gold underline-offset-2 hover:underline">Lint &amp; analyse</Link>{' '}
+          or <Link href="/v5/bias-check" className="text-brand-gold underline-offset-2 hover:underline">Bias check</Link>,
+          then export an audit report.
         </div>
       </div>
     </div>
@@ -298,10 +303,16 @@ export default function InputJDPage() {
 
 function ModeTab({ active, onClick, label, hint }: { active: boolean; onClick: () => void; label: string; hint: string }) {
   return (
-    <button onClick={onClick}
-      className={`flex-1 rounded px-3 py-2 text-left transition-colors ${active ? 'bg-surface-header text-text-on-dark' : 'hover:bg-surface-page'}`}>
-      <div className={`text-[12px] font-semibold ${active ? 'text-text-on-dark' : 'text-text-primary'}`}>{label}</div>
-      <div className={`text-[10px] ${active ? 'text-white/60' : 'text-text-muted'}`}>{hint}</div>
+    <button
+      onClick={onClick}
+      className={`flex-1 rounded-md border px-3 py-2 text-left transition-colors ${
+        active
+          ? 'border-brand-gold bg-brand-gold-lighter'
+          : 'border-transparent hover:bg-surface-page'
+      }`}
+    >
+      <div className={`text-[12px] font-semibold ${active ? 'text-brand-gold' : 'text-text-primary'}`}>{label}</div>
+      <div className={`text-[10px] ${active ? 'text-brand-gold/70' : 'text-text-muted'}`}>{hint}</div>
     </button>
   );
 }

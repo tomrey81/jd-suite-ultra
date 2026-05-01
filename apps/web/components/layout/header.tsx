@@ -17,7 +17,14 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   const pathname = usePathname();
-  const isJDEditor = pathname.startsWith('/jd/') && pathname !== '/jd/new';
+  // Only show JD-editor controls (DC %, Export, Honest Review, End for Now,
+  // Evaluate) when the route is actually a JD detail page. Upload, bulk-import,
+  // and the "new" placeholder page do not have a JD to act on.
+  const NON_EDITOR_JD_ROUTES = new Set(['/jd', '/jd/new', '/jd/input', '/jd/bulk-import']);
+  const isJDEditor =
+    pathname.startsWith('/jd/') &&
+    !NON_EDITOR_JD_ROUTES.has(pathname) &&
+    !pathname.startsWith('/jd/bulk-import');
 
   return (
     <header className="flex h-[60px] shrink-0 items-center justify-between bg-surface-header px-6">
