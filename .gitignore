@@ -16,3 +16,6 @@ test-results/
 *.jsonl
 packages/db/*_backup_*
 packages/db/jd_backup_*
+
+# Local IDE / Claude Code launch configs (contain env vars + credentials)
+.claude/launch.json
