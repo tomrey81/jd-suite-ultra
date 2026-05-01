@@ -11,6 +11,7 @@ import {
   midiToFreq,
 } from '@/lib/studio/engine';
 import { THEMES, scheduleTheme, themeDuration, type Theme } from '@/lib/studio/themes';
+import { scheduleFskBroadcast, fskDuration, FSK_MAX_CHARS } from '@/lib/studio/fsk';
 import { cn } from '@/lib/utils';
 
 type Tab = 'orchestra' | 'themes' | 'palette';
@@ -33,6 +34,8 @@ interface OrchestraTrack {
   pan: number;       // -1..1
   scaleKey: string;  // for instrument tracks only
   rootKey: string;
+  muted: boolean;
+  solo: boolean;
 }
 
 const STATUS_PILL: Record<string, { bg: string; fg: string; label: string }> = {
@@ -53,10 +56,14 @@ export function SonificatorView() {
 
   // Playback state
   const [playing, setPlaying] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<Theme | null>(null);
   const [tempo, setTempo] = useState(80); // 60..160 BPM master
   const [themeMix, setThemeMix] = useState(0.25); // 0..1 — theme volume vs orchestra
+  const [masterVol, setMasterVol] = useState(0.8); // 0..1
+  const [broadcasting, setBroadcasting] = useState<{ token: string; until: number } | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
   const sourcesRef = useRef<Array<OscillatorNode | AudioBufferSourceNode>>([]);
   const stopTimerRef = useRef<number | null>(null);
 
@@ -108,6 +115,8 @@ export function SonificatorView() {
         pan: 0,
         scaleKey: 'major',
         rootKey: 'C',
+        muted: false,
+        solo: false,
       },
     ]);
   };
@@ -136,7 +145,34 @@ export function SonificatorView() {
       stopTimerRef.current = null;
     }
     setPlaying(false);
+    setPaused(false);
+    if (ctxRef.current && ctxRef.current.state === 'suspended') {
+      try { ctxRef.current.resume(); } catch { /* ignore */ }
+    }
   };
+
+  const pausePlayback = async () => {
+    if (!ctxRef.current || !playing) return;
+    if (paused) {
+      try { await ctxRef.current.resume(); } catch { /* ignore */ }
+      setPaused(false);
+    } else {
+      try { await ctxRef.current.suspend(); } catch { /* ignore */ }
+      setPaused(true);
+    }
+  };
+
+  // Live master volume — keep gain node value in sync with state
+  useEffect(() => {
+    if (masterGainRef.current) masterGainRef.current.gain.value = masterVol;
+  }, [masterVol]);
+
+  // Cleanup on unmount — kill audio so it doesn't leak across pages
+  useEffect(() => () => {
+    sourcesRef.current.forEach((s) => { try { s.stop(); } catch { /* ignore */ } });
+    if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+    if (ctxRef.current) { try { ctxRef.current.close(); } catch { /* ignore */ } }
+  }, []);
 
   /**
    * Play the orchestra: each track plays its assigned sound for the JD title text,
@@ -154,8 +190,9 @@ export function SonificatorView() {
     const noteDur = beatDur * 0.85;
 
     const master = ctx.createGain();
-    master.gain.value = 0.8;
+    master.gain.value = masterVol;
     master.connect(ctx.destination);
+    masterGainRef.current = master;
 
     // Schedule theme underneath
     let themeDur = 0;
@@ -163,9 +200,15 @@ export function SonificatorView() {
       themeDur = scheduleTheme(ctx, currentTheme, now, master, themeMix);
     }
 
+    // Mute/Solo logic — if any track is solo, only solo tracks play
+    const soloActive = tracks.some((t) => t.solo);
+    const trackAudible = (t: OrchestraTrack) =>
+      !t.muted && (soloActive ? t.solo : true);
+
     // Schedule each track
     let maxTrackDur = 0;
     tracks.forEach((track, idx) => {
+      if (!trackAudible(track)) return;
       const text = track.jobTitle || 'JD';
       const chars = Array.from(text);
       const trackOffset = idx * 0.05; // slight stagger so they don't all hit on beat 0
@@ -235,6 +278,36 @@ export function SonificatorView() {
     stopTimerRef.current = window.setTimeout(() => setPlaying(false), dur * 1000 + 200);
   };
 
+  /**
+   * Broadcast a short audible token using FSK. The token format is
+   *   jd:<short-id>
+   * for a single-JD orchestra, or
+   *   orc:<count>:<first-id>
+   * for a multi-track orchestra.  Receiver page (/sonification/receiver)
+   * decodes and resolves to a JD link.
+   */
+  const broadcastToken = async () => {
+    if (broadcasting) return;
+    let payload = '';
+    if (tracks.length === 1) {
+      payload = `jd:${tracks[0].jdId.slice(0, 18)}`;
+    } else if (tracks.length > 1) {
+      payload = `orc:${tracks.length}:${tracks[0].jdId.slice(0, 14)}`;
+    } else {
+      setError('Add at least one JD to the orchestra before broadcasting.');
+      setTimeout(() => setError(null), 4000);
+      return;
+    }
+    const truncated = payload.slice(0, FSK_MAX_CHARS);
+    const ctx = ensureCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const dur = fskDuration(truncated.length);
+    scheduleFskBroadcast(ctx, truncated, ctx.currentTime, ctx.destination, { volume: 0.45 });
+    const until = Date.now() + dur * 1000 + 200;
+    setBroadcasting({ token: truncated, until });
+    window.setTimeout(() => setBroadcasting(null), dur * 1000 + 250);
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -253,22 +326,68 @@ export function SonificatorView() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {/* Master volume */}
+            <label className="flex items-center gap-1.5 rounded-full border border-border-default bg-white px-3 py-1.5 text-[10px] text-text-muted">
+              <span className="font-medium text-text-secondary">Master</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(masterVol * 100)}
+                onChange={(e) => setMasterVol(parseInt(e.target.value, 10) / 100)}
+                className="w-20 accent-brand-gold"
+                title={`Master volume ${Math.round(masterVol * 100)}%`}
+              />
+              <span className="w-7 text-right tabular-nums">{Math.round(masterVol * 100)}</span>
+            </label>
+
+            {/* Transport */}
             {!playing ? (
-              <button
-                onClick={playOrchestra}
-                disabled={tracks.length === 0 && !currentTheme}
-                className="rounded-full bg-brand-gold px-4 py-1.5 text-[11px] font-medium text-white hover:bg-brand-gold/90 disabled:opacity-40"
-              >
-                ▶ Play
-              </button>
+              <>
+                <button
+                  onClick={playOrchestra}
+                  disabled={tracks.length === 0 && !currentTheme}
+                  className="rounded-full bg-brand-gold px-4 py-1.5 text-[11px] font-medium text-white hover:bg-brand-gold/90 disabled:opacity-40"
+                  title="Play orchestra"
+                >
+                  ▶ Play
+                </button>
+              </>
             ) : (
-              <button
-                onClick={stopAll}
-                className="rounded-full bg-text-primary px-4 py-1.5 text-[11px] font-medium text-white"
-              >
-                ■ Stop
-              </button>
+              <>
+                <button
+                  onClick={pausePlayback}
+                  className="rounded-full border border-border-default bg-white px-3 py-1.5 text-[11px] font-medium text-text-primary hover:border-brand-gold"
+                  title={paused ? 'Resume' : 'Pause'}
+                >
+                  {paused ? '▶ Resume' : '❚❚ Pause'}
+                </button>
+                <button
+                  onClick={() => { stopAll(); setTimeout(playOrchestra, 50); }}
+                  className="rounded-full border border-border-default bg-white px-3 py-1.5 text-[11px] font-medium text-text-primary hover:border-brand-gold"
+                  title="Restart from beginning"
+                >
+                  ↻ Restart
+                </button>
+                <button
+                  onClick={stopAll}
+                  className="rounded-full bg-text-primary px-3 py-1.5 text-[11px] font-medium text-white"
+                  title="Stop"
+                >
+                  ■ Stop
+                </button>
+              </>
             )}
+
+            {/* Broadcast token */}
+            <button
+              onClick={broadcastToken}
+              disabled={tracks.length === 0 || !!broadcasting}
+              className="rounded-full border border-brand-gold bg-white px-3 py-1.5 text-[11px] font-medium text-brand-gold transition-colors hover:bg-brand-gold-lighter disabled:opacity-40"
+              title="Broadcast a short audible token that another device can decode at /sonification/receiver"
+            >
+              {broadcasting ? `📡 Broadcasting…` : '📡 Broadcast'}
+            </button>
           </div>
         </div>
       </div>
@@ -562,16 +681,38 @@ function TrackRow({
     animalKeys;
 
   return (
-    <li className="grid items-center gap-2 px-3 py-2.5" style={{ gridTemplateColumns: 'auto 1fr auto auto auto auto auto' }}>
+    <li className="grid items-center gap-2 px-3 py-2.5" style={{ gridTemplateColumns: 'auto 1fr auto auto auto auto auto auto auto' }}>
       <span className="text-[10px] font-mono text-text-muted">{index + 1}</span>
       <div className="min-w-0">
-        <div className="truncate text-[11px] font-medium text-text-primary" title={track.jobTitle}>
+        <div className={cn('truncate text-[11px] font-medium', track.muted ? 'text-text-muted line-through' : 'text-text-primary')} title={track.jobTitle}>
           {track.jobTitle}
         </div>
         <div className="text-[9px] text-text-muted">
           {track.soundType} · {track.soundKey}
         </div>
       </div>
+      {/* Mute */}
+      <button
+        onClick={() => onUpdate({ muted: !track.muted })}
+        title={track.muted ? 'Unmute' : 'Mute'}
+        className={cn(
+          'rounded border px-1.5 py-0.5 text-[9px] font-bold transition-colors',
+          track.muted ? 'border-danger bg-danger-bg text-danger' : 'border-border-default text-text-muted hover:border-danger hover:text-danger',
+        )}
+      >
+        M
+      </button>
+      {/* Solo */}
+      <button
+        onClick={() => onUpdate({ solo: !track.solo })}
+        title={track.solo ? 'Unsolo' : 'Solo (silences non-solo tracks)'}
+        className={cn(
+          'rounded border px-1.5 py-0.5 text-[9px] font-bold transition-colors',
+          track.solo ? 'border-brand-gold bg-brand-gold-lighter text-brand-gold' : 'border-border-default text-text-muted hover:border-brand-gold hover:text-brand-gold',
+        )}
+      >
+        S
+      </button>
       <select
         value={track.soundType}
         onChange={(e) => {

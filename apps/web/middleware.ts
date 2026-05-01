@@ -4,6 +4,9 @@ import type { NextRequest } from 'next/server';
 const PUBLIC_PATHS = new Set([
   '/welcome', '/login', '/register', '/forgot-password', '/reset-password',
   '/forbidden', '/legal/terms', '/legal/privacy',
+  // Sonification receiver — cross-device entry point, must work without auth
+  // since the listening device may be a phone that's not signed in.
+  '/sonification/receiver',
 ]);
 
 const PUBLIC_PREFIXES = [

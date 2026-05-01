@@ -530,6 +530,68 @@ function playBlizzard(ctx: Ctx, d: AudioNode, vol: number, dur: number) {
   playLightRain(ctx, d, vol * 0.3, dur);
 }
 
+/**
+ * Betoniarka (concrete mixer) — slow rotating drum with periodic metallic
+ * clanks of aggregate falling against the rim. Three layers: motor rumble,
+ * tumbling aggregate noise, and randomly-timed metallic transients.
+ */
+function playBetoniarka(ctx: Ctx, d: AudioNode, vol: number, dur: number) {
+  const t0 = ctx.currentTime;
+  const sr = ctx.sampleRate;
+  const len = Math.ceil(sr * dur);
+
+  // 1. Motor rumble — slow tremolo on low rumble
+  const rumbleBuf = ctx.createBuffer(1, len, sr);
+  const rumble = rumbleBuf.getChannelData(0);
+  let r = 0;
+  for (let i = 0; i < len; i++) {
+    r = 0.992 * r + (Math.random() * 2 - 1) * 0.008;
+    rumble[i] = r * (0.7 + 0.3 * Math.sin((i / sr) * Math.PI * 2 * 0.7));
+  }
+  const rumbleSrc = ctx.createBufferSource();
+  rumbleSrc.buffer = rumbleBuf;
+  const rumbleLP = ctx.createBiquadFilter();
+  rumbleLP.type = 'lowpass'; rumbleLP.frequency.value = 110; rumbleLP.Q.value = 0.6;
+  const rumbleGain = ctx.createGain();
+  rumbleGain.gain.value = vol * 0.55;
+  rumbleSrc.connect(rumbleLP); rumbleLP.connect(rumbleGain); rumbleGain.connect(d);
+  rumbleSrc.start(t0);
+
+  // 2. Tumbling aggregate — band-passed noise modulated by drum rotation
+  const tumbleBuf = ctx.createBuffer(1, len, sr);
+  const tumble = tumbleBuf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    tumble[i] = (Math.random() * 2 - 1) * (0.5 + 0.5 * Math.sin((i / sr) * Math.PI * 2 * 1.4));
+  }
+  const tumbleSrc = ctx.createBufferSource();
+  tumbleSrc.buffer = tumbleBuf;
+  const tumbleBP = ctx.createBiquadFilter();
+  tumbleBP.type = 'bandpass'; tumbleBP.frequency.value = 700; tumbleBP.Q.value = 0.8;
+  const tumbleGain = ctx.createGain();
+  tumbleGain.gain.value = vol * 0.18;
+  tumbleSrc.connect(tumbleBP); tumbleBP.connect(tumbleGain); tumbleGain.connect(d);
+  tumbleSrc.start(t0);
+
+  // 3. Metallic clanks every ~0.45s (stones hitting the wall)
+  const clankCount = Math.max(1, Math.floor(dur / 0.45));
+  for (let i = 0; i < clankCount; i++) {
+    const ct = t0 + i * 0.45 + Math.random() * 0.18;
+    if (ct > t0 + dur) break;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.setValueAtTime(280 + Math.random() * 160, ct);
+    o.frequency.exponentialRampToValueAtTime(140 + Math.random() * 60, ct + 0.18);
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 600; f.Q.value = 4;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, ct);
+    g.gain.linearRampToValueAtTime(vol * 0.25, ct + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, ct + 0.22);
+    o.connect(f); f.connect(g); g.connect(d);
+    o.start(ct); o.stop(ct + 0.25);
+  }
+}
+
 export const NATURE_SOUNDS: Record<string, NatureSoundDef> = {
   wind:            { label: 'Wind',            icon: '💨', color: '#7A8A9A', play: playWind },
   waves:           { label: 'Waves',           icon: '🌊', color: '#5A7A8A', play: playWaves },
@@ -547,6 +609,7 @@ export const NATURE_SOUNDS: Record<string, NatureSoundDef> = {
   lightRain:       { label: 'Light Rain',      icon: '🌦', color: '#7A8A9A', play: playLightRain },
   heavyRain:       { label: 'Heavy Rain',      icon: '⛈',  color: '#4A5A7A', play: playHeavyRain },
   blizzard:        { label: 'Blizzard',        icon: '❄',  color: '#8A9AAA', play: playBlizzard },
+  betoniarka:      { label: 'Betoniarka',      icon: '🛞', color: '#7A6A55', play: playBetoniarka },
 };
 
 // ── ANIMAL SOUNDS (extended from 12 to 17) ─────────────────────────────────
