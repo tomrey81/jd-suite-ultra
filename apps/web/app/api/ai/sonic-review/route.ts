@@ -106,7 +106,8 @@ export async function POST(req: Request) {
 
   // Primary attempt: full prompt
   try {
-    const raw = await callClaude(SONIC_REVIEW_SYSTEM, buildPrompt(jdText, wordCount), 4000);
+    const raw = await callClaude(SONIC_REVIEW_SYSTEM, buildPrompt(jdText, wordCount), 4000,
+      { operation: 'jd.sonicReview', context: { orgId: session?.orgId, userId: session?.user?.id } });
     const result = safeParseJson(raw);
 
     if (!result.ok) {
@@ -148,6 +149,7 @@ export async function POST(req: Request) {
         'Return valid JSON only. No markdown. No explanation.',
         fallbackPrompt,
         2000,
+        { operation: 'jd.sonicReview.fallback', context: { orgId: session?.orgId, userId: session?.user?.id } },
       );
 
       const fallbackResult = safeParseJson(fallbackRaw);
