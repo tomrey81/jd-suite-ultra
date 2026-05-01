@@ -70,6 +70,13 @@ model User {
   accessCodeUses   AccessCodeUse[]
   authTokens       AuthToken[]
 
+  // Phase 1 — Ultra additions
+  aiUsageLogs       AiUsageLog[]
+  axiomeraRunsCreated AxiomeraRun[] @relation("AxiomeraRunCreator")
+  jdqRunsCreated    JdqRun[]      @relation("JdqRunCreator")
+  jdqProgramsCreated JdqProgram[] @relation("JdqProgramCreator")
+  jdqProgramsSealed  JdqProgram[] @relation("JdqProgramSealer")
+
   @@map("users")
 }
 
@@ -290,6 +297,11 @@ model JobDescription {
   exports          Export[]
   payGroupMembers  PayGroupMember[]
   architectureSlot JobArchitectureSlot?
+
+  // Phase 1 — Ultra additions (Axiomera + JDQ)
+  axiomeraRuns AxiomeraRun[]
+  jdqRuns      JdqRun[]
+  aiUsageLogs  AiUsageLog[]
 
   @@index([orgId])
   @@index([ownerId])
@@ -760,4 +772,324 @@ model JobArchitectureSlot {
   @@index([orgId])
   @@index([familyId])
   @@map("job_architecture_slots")
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Phase 1 — Ultra additions: AI usage logging + Axiomera/JDQ engines
+// All additive. None replace or modify existing Pro models.
+// Default behavior unchanged when feature flags are OFF.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── AI Usage Log (insert-only, populated by lib/ai/call-ai.ts) ───────────────
+
+model AiUsageLog {
+  id                   String   @id @default(uuid())
+  operation            String   // e.g. "jd.evaluate.axiomera"
+  modelId              String   // e.g. "claude-sonnet-4-6"
+  modelTier            String   // "haiku" | "sonnet" | "opus" | "embedding-small" | "embedding-large" | "deterministic"
+  promptVersion        String   // "v1.0.0"
+  orgId                String?
+  userId               String?
+  jdId                 String?
+  programId            String?  // links to JdqProgram if applicable
+  inputTokensEstimate  Int?
+  inputTokensActual    Int?
+  outputTokensEstimate Int?
+  outputTokensActual   Int?
+  estimatedCostUsd     Decimal  @db.Decimal(10, 6)
+  actualCostUsd        Decimal? @db.Decimal(10, 6)
+  cacheStatus          String   // "hit" | "miss" | "n/a"
+  cacheKey             String?
+  durationMs           Int?
+  status               String   // "ok" | "error" | "timeout" | "rate_limited"
+  errorMessage         String?
+  createdAt            DateTime @default(now())
+
+  // Optional FKs (SetNull on parent delete to preserve audit trail)
+  user User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  jd   JobDescription? @relation(fields: [jdId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([operation, createdAt])
+  @@index([userId])
+  @@index([jdId])
+  @@map("ai_usage_log")
+}
+
+// ── Axiomera Engine ──────────────────────────────────────────────────────────
+// Runs the full R/S/E/WC composite per Axiomera Whitepaper v1.0.
+
+model AxiomeraRun {
+  id                String   @id @default(uuid())
+  jdId              String
+  jdVersionId       String?  // optional link to a specific JDVersion snapshot
+  programId         String?  // optional sealed program reference (Phase 2)
+  engineVersion     String   @default("axiomera-v1.0")
+  promptVersionR    String   @default("v1.0.0")
+  promptVersionE    String   @default("v1.0.0")
+
+  // R — Responsibility (47.2%)
+  rPkt              Int      // points (140-635 per Table 12)
+  rZone             Int      // 1-9
+  rConfidence       Decimal  @db.Decimal(4, 3) // 0.000-1.000
+  rActiveKeys       Json     // string[] of active R-hypothesis keys
+  rEvidence         Json     // { [hypothesisKey]: quote }
+  rContradictions   Json     // string[] of detected contradictions
+
+  // S — Skills (33.3%)
+  sPkt              Int      // 50/90/150/230/333 per Table 14
+  sLevel            String   // "S1" | "S2" | "S3" | "S4" | "S5"
+  sSource           String   // "primary" | "esco" | "isco_median"
+  sEdu              Int?     // 1-5 if detected
+  sExp              Int?     // 1-5 if detected
+  sIscoCode         String?  // ISCO_2 if used for fallback
+
+  // E — Effort (19.5%)
+  ePkt              Int      // E_score × 430
+  eScore            Decimal  @db.Decimal(4, 3) // 0.000-1.000
+  cogScore          Decimal  @db.Decimal(5, 2) // 0.00-100.00
+  emoScore          Decimal  @db.Decimal(5, 2)
+  phyScore          Decimal  @db.Decimal(5, 2)
+  eConfidence       Decimal  @db.Decimal(4, 3)
+  eActiveKeys       Json     // string[]
+  eEvidence         Json     // { [key]: quote }
+
+  // WC — Working Conditions (separate compensation)
+  wcPkt             Int      // 50-350 per Table 20
+  wcLevel           String   // "W1" | "W2" | "W3" | "W4" | "W5"
+  wcIscoCode        String?
+
+  // Composite
+  totalRSE          Int      // R_pkt + S_pkt + E_pkt
+  grade             Int      // round((R+S+E)/50)
+  band              String   // "A1" | "A2" | ... | "E5"
+  ciGlobal          Decimal  @db.Decimal(4, 3)
+  contradictionFlag Boolean  @default(false)
+  needsReview       Boolean  @default(false)
+
+  // Audit
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  jd        JobDescription @relation(fields: [jdId], references: [id], onDelete: Cascade)
+  createdBy User?          @relation("AxiomeraRunCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  program   JdqProgram?    @relation(fields: [programId], references: [id], onDelete: SetNull)
+  criterionScores AxiomeraCriterionScore[]
+  validationGates AxiomeraValidationGate[]
+
+  @@index([jdId, createdAt])
+  @@index([programId])
+  @@map("axiomera_runs")
+}
+
+// Per-dimension breakdown for reporting / drill-down.
+model AxiomeraCriterionScore {
+  id            String   @id @default(uuid())
+  runId         String
+  dimension     String   // "R" | "S" | "E_COG" | "E_EMO" | "E_PHY" | "WC"
+  rawScore      Decimal  @db.Decimal(8, 3)
+  normalizedScore Decimal? @db.Decimal(5, 2)
+  pointsContribution Int
+  weight        Decimal  @db.Decimal(4, 3)
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  run AxiomeraRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("axiomera_criterion_scores")
+}
+
+// Validation gate results — tracks H1-H4 plus contradiction flags etc.
+model AxiomeraValidationGate {
+  id        String   @id @default(uuid())
+  runId     String
+  gateName  String   // "H1_COG_O*NET" | "H4_zone_differentiation" | "CI_global_threshold" | etc.
+  passed    Boolean
+  threshold Decimal? @db.Decimal(8, 4)
+  observed  Decimal? @db.Decimal(8, 4)
+  message   String?
+  createdAt DateTime @default(now())
+
+  run AxiomeraRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("axiomera_validation_gates")
+}
+
+// ── JDQ Quality Layer ────────────────────────────────────────────────────────
+// Faster, lighter-weight quality assessment. May be deterministic-only.
+
+model JdqRun {
+  id                  String   @id @default(uuid())
+  jdId                String
+  engineVersion       String   @default("jdq-v1.0")
+  structureCoverage   Decimal  @db.Decimal(5, 2) // 0-100
+  languageScore       Decimal  @db.Decimal(5, 2)
+  factorsScore        Decimal  @db.Decimal(5, 2)
+  decisionScore       Decimal  @db.Decimal(5, 2)
+  composite           Decimal  @db.Decimal(5, 2)
+  overallLight        String   // "green" | "amber" | "red"
+  weights             Json     // { structure, language, factors, decision }
+  findings            Json     // { activeBiasFlags, contradictions, missingFields, ... }
+  edgeCaseCodes       Json     // string[] e.g. ["EC-04", "EC-12"]
+  createdAt           DateTime @default(now())
+  createdById         String?
+
+  jd          JobDescription @relation(fields: [jdId], references: [id], onDelete: Cascade)
+  createdBy   User?          @relation("JdqRunCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  rHypotheses RHypothesisRecord[]
+  eHypotheses EHypothesisRecord[]
+  rZoneEstimates RZoneEstimate[]
+  eScoreSummaries EScoreSummary[]
+
+  @@index([jdId, createdAt])
+  @@map("jdq_runs")
+}
+
+model RHypothesisRecord {
+  id           String   @id @default(uuid())
+  jdqRunId     String
+  hypothesisKey String  // e.g. "no_prior_experience"
+  level        Int     // 1-3
+  active       Boolean
+  evidence     String?
+  createdAt    DateTime @default(now())
+
+  run JdqRun @relation(fields: [jdqRunId], references: [id], onDelete: Cascade)
+
+  @@index([jdqRunId])
+  @@index([hypothesisKey])
+  @@map("r_hypothesis_records")
+}
+
+model EHypothesisRecord {
+  id           String   @id @default(uuid())
+  jdqRunId     String
+  hypothesisKey String
+  dimension    String  // "COG" | "EMO" | "PHY"
+  hypothesisType String // "P" | "I"
+  active       Boolean
+  evidence     String?
+  createdAt    DateTime @default(now())
+
+  run JdqRun @relation(fields: [jdqRunId], references: [id], onDelete: Cascade)
+
+  @@index([jdqRunId])
+  @@index([hypothesisKey])
+  @@map("e_hypothesis_records")
+}
+
+model RZoneEstimate {
+  id            String   @id @default(uuid())
+  jdqRunId      String
+  weightedZone  Decimal  @db.Decimal(4, 2)
+  roundedZone   Int
+  rPoints       Int
+  confidence    String   // "high" | "medium" | "low"
+  rLevelMean    Decimal  @db.Decimal(4, 2)
+  createdAt     DateTime @default(now())
+
+  run JdqRun @relation(fields: [jdqRunId], references: [id], onDelete: Cascade)
+
+  @@index([jdqRunId])
+  @@map("r_zone_estimates")
+}
+
+model EScoreSummary {
+  id        String   @id @default(uuid())
+  jdqRunId  String
+  cog       Decimal  @db.Decimal(5, 2)
+  emo       Decimal  @db.Decimal(5, 2)
+  phy       Decimal  @db.Decimal(5, 2)
+  eScore    Decimal  @db.Decimal(4, 3)
+  ePkt      Int
+  confidence String  // "high" | "medium" | "low"
+  createdAt DateTime @default(now())
+
+  run JdqRun @relation(fields: [jdqRunId], references: [id], onDelete: Cascade)
+
+  @@index([jdqRunId])
+  @@map("e_score_summaries")
+}
+
+// ── JDQ Program (Sealed Programs — Phase 2 use; Phase 1 schema only) ─────────
+
+model JdqProgram {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  description String?
+  weights     Json     // RSEWeights and JDQWeights
+  engineVersion String @default("axiomera-v1.0")
+  status      String   @default("DRAFT") // "DRAFT" | "SEALED" | "SUPERSEDED"
+  sealed      Boolean  @default(false)
+  sealedAt    DateTime?
+  sealedById  String?
+  supersededById String? // points to next version
+  versionNumber Int    @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  createdBy User?         @relation("JdqProgramCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  sealedBy  User?         @relation("JdqProgramSealer", fields: [sealedById], references: [id], onDelete: SetNull)
+  axiomeraRuns AxiomeraRun[]
+
+  @@index([orgId])
+  @@index([status])
+  @@map("jdq_programs")
+}
+
+// ── Approval Records (Phase 2 use; Phase 1 schema only) ──────────────────────
+
+model ApprovalRecord {
+  id                 String   @id @default(uuid())
+  jdId               String
+  jdVersionId        String?  // links to JDVersion of changeType STATUS_CHANGE
+  fromStage          String?
+  toStage            String   // "DRAFT" | "MANAGER_VALIDATION" | "HR_REVIEW" | "GOVERNANCE_APPROVAL" | "APPROVED" | "PUBLISHED" | "REJECTED" | "ARCHIVED"
+  action             String   // "ADVANCE" | "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "DELEGATE" | "COMMENT" | "WITHDRAW" | "RESUBMIT"
+  actorId            String
+  comment            String?
+  isMandatoryComment Boolean  @default(false)
+  delegatedToUserId  String?
+  policyVersion      String?
+  createdAt          DateTime @default(now())
+
+  @@index([jdId, createdAt])
+  @@index([jdVersionId])
+  @@index([toStage])
+  @@map("approval_records")
+}
+
+// ── Intake Session + Project Readiness (Phase 3 use; Phase 1 schema only) ────
+
+model IntakeSession {
+  id        String   @id @default(uuid())
+  orgId     String
+  answers   Json     // { itemId: { answer, note } }
+  status    String   @default("OPEN") // "OPEN" | "SUBMITTED"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdById String?
+
+  @@index([orgId, createdAt])
+  @@map("intake_sessions")
+}
+
+model ReadinessScore {
+  id        String   @id @default(uuid())
+  orgId     String
+  jdId      String?
+  scores    Json     // { dimensionId: number }
+  totalScore Int
+  status    String   // "READY" | "CONDITIONAL" | "NOT_READY"
+  fastFails Json     // string[]
+  createdAt DateTime @default(now())
+  createdById String?
+
+  @@index([orgId, createdAt])
+  @@index([jdId])
+  @@map("readiness_scores")
 }

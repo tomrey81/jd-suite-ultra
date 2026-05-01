@@ -1,3 +1,16 @@
+import { callAi, type CallAiContext } from './ai/call-ai';
+import type { ModelTier } from './ai/model-registry';
+
+/**
+ * Backwards-compatible Anthropic Claude wrapper.
+ *
+ * All existing routes call `callClaude(system, user, maxTokens)`. This now
+ * routes through Ultra's `callAi()` so every call is logged to AiUsageLog with
+ * cost estimation. Routes that want to record a specific operation name should
+ * call `callAi()` directly; otherwise the operation defaults to
+ * `'legacy.callClaude'` and is still tracked.
+ */
+
 export const AI_MODEL = process.env.AI_MODEL || 'claude-sonnet-4-20250514';
 
 export const JD_SYSTEM_PROMPT = `You are a specialist assistant for JD Suite.
@@ -25,41 +38,46 @@ Provenance matters: source-based, inferred, or AI-proposed.
 
 Plain text only - no markdown headers, no asterisks, no bullet symbols beyond a dash.`;
 
+export interface CallClaudeOptions {
+  operation?: string;
+  tier?: ModelTier;
+  context?: CallAiContext;
+  temperature?: number;
+}
+
+/**
+ * Legacy 3-arg signature. Preserved so existing routes don't break.
+ * For new code, prefer `callAi()` directly with a specific operation name.
+ */
+export async function callClaude(
+  system: string,
+  userMessage: string,
+  maxTokens?: number,
+): Promise<string>;
+/**
+ * Extended signature with operation name + context for cost tracking.
+ * Routes should migrate to this form to get accurate per-feature cost.
+ */
+export async function callClaude(
+  system: string,
+  userMessage: string,
+  maxTokens: number,
+  options: CallClaudeOptions,
+): Promise<string>;
 export async function callClaude(
   system: string,
   userMessage: string,
   maxTokens: number = 3000,
+  options: CallClaudeOptions = {},
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-  }
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
+  const result = await callAi({
+    operation: options.operation ?? 'legacy.callClaude',
+    tier: options.tier,
+    systemPrompt: system,
+    userPrompt: userMessage,
+    maxTokens,
+    temperature: options.temperature,
+    context: options.context,
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
-    throw new Error(err.error?.message || `Anthropic API error: ${res.status}`);
-  }
-
-  const data = await res.json();
-  const content = data.content?.[0];
-  if (!content || content.type !== 'text') {
-    throw new Error('Unexpected response from Claude');
-  }
-
-  return content.text;
+  return result.text;
 }

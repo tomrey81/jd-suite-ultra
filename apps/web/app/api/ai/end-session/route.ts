@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       `Generate end-of-session summary. JD: ${jdText} DQS: ${dqs}%
 Return JSON: {"sessionSummary":"2-3 sentence plain text summary","completedWell":["fields well developed"],"mustComplete":[{"field":"name","why":"reason"}],"questionsForNextSession":["specific questions"],"aiEnhancements":["2-3 improvements"],"estimatedQualityGain":"plain text estimate"}`,
       2000,
-    );
+      { operation: 'jd.endSession.summary', context: { orgId: session?.orgId, userId: session?.user?.id } });
 
     const result = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim());
     return NextResponse.json(result);

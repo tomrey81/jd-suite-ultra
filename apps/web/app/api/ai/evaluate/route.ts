@@ -31,7 +31,7 @@ Return: {"overallCompleteness":0-100,"summary":"brief plain text assessment","cr
 
 All 16 in order: Knowledge and Experience, Finding Solutions, Planning and Organisation, Communication and Inclusion Skills, Practical Skills, Physical Effort, Mental Effort, Emotional Effort, Initiative and Independence, Responsibility for Welfare of People and Society, Management Responsibility, Responsibility for Information and Confidentiality, Responsibility for Physical and Financial Resources, Responsibility for Strategic Planning, Responsibility for Equality and Inclusion, Working Conditions.`,
       4000,
-    );
+      { operation: 'jd.evaluate.16criterion', context: { orgId: session?.orgId, userId: session?.user?.id } });
 
     const result = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim());
     return NextResponse.json(result);

@@ -158,7 +158,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const text = await callClaude(KRYSTYNA_SYSTEM(context), userMessage, 1500);
+    const text = await callClaude(KRYSTYNA_SYSTEM(context), userMessage, 1500,
+      { operation: 'companion.message', context: { orgId: session?.orgId, userId: session?.user?.id } });
     return NextResponse.json({ reply: text.trim() });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI request failed';

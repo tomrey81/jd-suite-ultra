@@ -27,7 +27,7 @@ EXISTING JD DATA:
 ${jdText}
 Rules: professional HR language, plain text only, no markdown, gender-neutral, do not invent facts, return text content only.`,
       600,
-    );
+      { operation: 'jd.generateField', context: { orgId: session?.orgId, userId: session?.user?.id } });
 
     return NextResponse.json({ content: text.trim() });
   } catch (error) {
