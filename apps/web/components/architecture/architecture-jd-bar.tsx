@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { ExportMenu } from '@/components/export/export-menu';
 
 interface JDLite {
   id: string;
@@ -235,6 +236,26 @@ export function ArchitectureJDBar({ jds, unplacedCount, totalPlaced, familiesCou
             );
           })}
         </div>
+
+        <ExportMenu
+          data={{
+            title: 'Job Architecture · all JDs',
+            subtitle: `${familiesCount} families · ${totalPlaced} placed · ${unplacedCount} unplaced`,
+            rows: jds,
+            columns: [
+              { key: 'jobTitle',  label: 'Job title',  width: 32 },
+              { key: 'status',    label: 'Status',     width: 14 },
+              { key: 'orgUnit',   label: 'Org unit',   width: 22 },
+              { key: 'folder',    label: 'Folder',     width: 18 },
+              { key: 'hasEval',   label: 'Evaluated',  width: 10, get: (r) => (r.hasEval ? 'yes' : 'no') },
+              { key: 'hasSlot',   label: 'Placed',     width: 10, get: (r) => (r.hasSlot ? 'yes' : 'no') },
+            ],
+          }}
+          fileName="architecture-jds"
+          initialPageFormat="A4"
+          initialOrientation="landscape"
+          className="shrink-0"
+        />
 
         <Link
           href="/jd/new"

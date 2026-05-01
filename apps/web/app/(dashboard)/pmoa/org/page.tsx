@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ReactFlow,
@@ -13,6 +13,7 @@ import {
   Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { ExportMenu } from '@/components/export/export-menu';
 
 interface PositionDTO {
   id: string;
@@ -84,6 +85,27 @@ export default function PmoaOrgPage() {
   const [globalClarifications, setGlobalClarifications] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Build a flat row set for tabular export (positions + holder + dept + acting/split state)
+  const exportRows = useMemo(() => {
+    const deptName = new Map(departments.map((d) => [d.id, d.name]));
+    return positions.map((p) => {
+      const acting = assignments.find((a) => a.positionId === p.id && a.kind === 'acting');
+      const split = assignments.find((a) => a.positionId === p.id && a.kind === 'split');
+      return {
+        positionNumber: p.positionNumber || '',
+        name: p.name,
+        department: p.departmentId ? deptName.get(p.departmentId) || '' : '',
+        holder: p.vacancy ? '(vacant)' : (p.currentHolderName || ''),
+        reportsTo: p.reportsToId ? positions.find((x) => x.id === p.reportsToId)?.name || '' : '',
+        spanOfControl: p.spanOfControl,
+        actingHolder: acting?.personName || '',
+        splitAssignment: split ? 'yes' : '',
+        linkedJD: p.linkedJdId ? `/jd/${p.linkedJdId}` : '',
+      };
+    });
+  }, [positions, departments, assignments]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -215,6 +237,28 @@ export default function PmoaOrgPage() {
         <div className="flex items-center gap-2">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search positions…"
             className="w-48 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-xs outline-none focus:border-brand-gold" />
+          <ExportMenu
+            canvasRef={canvasRef}
+            data={{
+              title: 'Org map · positions',
+              subtitle: `${positions.length} positions · ${departments.length} departments · ${assignments.length} assignments`,
+              rows: exportRows,
+              columns: [
+                { key: 'positionNumber', label: 'Position #', width: 14 },
+                { key: 'name', label: 'Position', width: 32 },
+                { key: 'department', label: 'Department', width: 22 },
+                { key: 'holder', label: 'Holder', width: 24 },
+                { key: 'reportsTo', label: 'Reports to', width: 28 },
+                { key: 'spanOfControl', label: 'Span', width: 8 },
+                { key: 'actingHolder', label: 'Acting', width: 18 },
+                { key: 'splitAssignment', label: 'Split', width: 8 },
+                { key: 'linkedJD', label: 'Linked JD', width: 26 },
+              ],
+            }}
+            fileName="org-map"
+            initialPageFormat="A3"
+            initialOrientation="landscape"
+          />
           <button onClick={buildOrg} disabled={building}
             className="rounded-md bg-brand-gold px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
             {building ? 'Building…' : positions.length === 0 ? '↻ Build org from documents' : '↻ Re-build from documents'}
@@ -241,7 +285,7 @@ export default function PmoaOrgPage() {
 
       {/* Canvas + side panel */}
       <div className="relative flex flex-1 overflow-hidden">
-        <div className="flex-1">
+        <div className="flex-1" ref={canvasRef}>
           {loading ? (
             <div className="flex h-full items-center justify-center text-[13px] text-text-muted">Loading…</div>
           ) : positions.length === 0 ? (

@@ -59,142 +59,159 @@ function getSR(): { new (): SpeechRecognitionInstance } | null {
 }
 
 /**
- * Krystyna avatar — warm friendly face under a builder's helmet.
+ * Krystyna avatar — official design from the brand reference.
  *
- * Design notes:
- * — Round peach-toned face (not grey), sized so the helmet sits naturally on top
- * — Big round eyes with pupils + highlight, eyebrows for expression
- * — Gentle smile that bends per mood (no eerie flat line)
- * — Helmet has a real brim with shadow, a domed top, and a centred crest stripe
- * — Cheek blush adds warmth without being childish
- * — Mood-driven: idle / thinking / listening / error
+ * Design is fixed (per spec). The only thing that changes per mood is the
+ * mouth/eye geometry and a subtle blink animation on idle.
+ *
+ * Key visual elements (preserved from reference):
+ * — Bold black outer circle border, off-white inside
+ * — Red helmet with black outline, cream stripe over the crown,
+ *   yellow hexagonal front badge, two small white reflective patches
+ * — Round peach face below helmet
+ * — Distinctive Z-shaped brow+nose line on the right
+ * — Two simple black dot eyes
+ * — Round pink cheek blushes
+ * — Soft chin shadow
  */
 function KrystynaAvatar({ mood = 'idle', size = 36 }: { mood?: Mood; size?: number }) {
-  // Mood-driven geometry
-  const browLeft =
-    mood === 'thinking' ? 'M19 24 L25 22.5'
-    : mood === 'error' ? 'M19 23.5 L25 22'
-    : 'M19.5 23 L24.5 22.5';
-  const browRight =
-    mood === 'thinking' ? 'M27 22.5 L33 24'
-    : mood === 'error' ? 'M27 22 L33 23.5'
-    : 'M27.5 22.5 L32.5 23';
+  // Mood-driven geometry — only mouth + eyes change.
+  // Smile gently shifts; do not change the helmet, face, nose, or palette.
   const mouthD =
-    mood === 'thinking' ? 'M22.5 33 Q26 32 29.5 33'   // pursed
-    : mood === 'error' ? 'M22.5 33.5 Q26 35 29.5 33.5' // tiny frown
-    : mood === 'listening' ? 'M22 32.5 Q26 35 30 32.5' // open smile
-    : 'M22.5 32.5 Q26 34.5 29.5 32.5';                  // soft smile
+    mood === 'thinking'  ? 'M52 75 Q56 75 60 75'        // pursed flat
+    : mood === 'error'    ? 'M52 76 Q56 79 60 76'        // tiny frown
+    : mood === 'listening' ? 'M50 74 Q56 80 62 74'        // wider open smile
+    :                        'M52 74 Q56 77 60 74';       // soft smile
 
-  const eyeOpen = mood !== 'thinking';
+  const eyesClosed = mood === 'thinking';
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 52 52"
-      className={cn('shrink-0', mood === 'thinking' && 'motion-safe:animate-pulse')}
+      viewBox="0 0 100 100"
+      className="shrink-0 [--blink-dur:5s]"
       aria-label={`Krystyna (${mood})`}
     >
       <defs>
-        <radialGradient id="krystyna-face" cx="40%" cy="40%" r="65%">
-          <stop offset="0%" stopColor="#FAE2C8" />
-          <stop offset="60%" stopColor="#EFCBA6" />
-          <stop offset="100%" stopColor="#D9A77E" />
-        </radialGradient>
-        <linearGradient id="krystyna-helmet" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#E85B45" />
-          <stop offset="60%" stopColor="#C9382A" />
-          <stop offset="100%" stopColor="#A02619" />
-        </linearGradient>
-        <linearGradient id="krystyna-brim" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#7B1A12" />
-          <stop offset="100%" stopColor="#5A110B" />
-        </linearGradient>
+        {/* Subtle blink keyframes — only used on idle */}
+        <style>{`
+          @keyframes krystyna-blink {
+            0%, 92%, 100% { transform: scaleY(1); }
+            95%, 97%      { transform: scaleY(0.1); }
+          }
+          .krystyna-eye {
+            transform-box: fill-box;
+            transform-origin: center;
+          }
+          @media (prefers-reduced-motion: no-preference) {
+            .krystyna-blink {
+              animation: krystyna-blink var(--blink-dur, 5s) infinite ease-in-out;
+            }
+          }
+        `}</style>
       </defs>
 
-      {/* ---------- Face ---------- */}
-      {/* Soft drop shadow under chin */}
-      <ellipse cx="26" cy="46" rx="11" ry="1.2" fill="#000" opacity="0.08" />
+      {/* ---------- Outer black-ringed white badge ---------- */}
+      <circle cx="50" cy="50" r="48" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="2.4" />
+
+      {/* ---------- Face (drawn first, helmet sits on top) ---------- */}
+      {/* Chin shadow */}
+      <ellipse cx="50" cy="86" rx="20" ry="1.8" fill="#1A1A1A" opacity="0.13" />
       {/* Face circle */}
-      <circle cx="26" cy="32" r="13.5" fill="url(#krystyna-face)" stroke="#A87650" strokeWidth="0.6" />
-      {/* Cheek blush */}
-      <circle cx="18.5" cy="34" r="2.2" fill="#E89A7B" opacity="0.45" />
-      <circle cx="33.5" cy="34" r="2.2" fill="#E89A7B" opacity="0.45" />
-      {/* Eyebrows */}
-      <path d={browLeft} stroke="#3A2418" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-      <path d={browRight} stroke="#3A2418" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-      {/* Eyes */}
-      {eyeOpen ? (
-        <>
-          {/* whites */}
-          <ellipse cx="22" cy="29.5" rx="2" ry="2.3" fill="#FFFFFF" />
-          <ellipse cx="30" cy="29.5" rx="2" ry="2.3" fill="#FFFFFF" />
-          {/* pupils */}
-          <circle cx="22.2" cy="30" r="1.15" fill="#2A1810" />
-          <circle cx="30.2" cy="30" r="1.15" fill="#2A1810" />
-          {/* highlights */}
-          <circle cx="21.7" cy="29.4" r="0.45" fill="#FFFFFF" />
-          <circle cx="29.7" cy="29.4" r="0.45" fill="#FFFFFF" />
-        </>
-      ) : (
-        // Closed/concentrating eyes — tiny arcs
-        <>
-          <path d="M20 30 Q22 28.5 24 30" stroke="#2A1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-          <path d="M28 30 Q30 28.5 32 30" stroke="#2A1810" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-        </>
-      )}
-      {/* Nose hint */}
-      <path d="M25.5 31.5 Q26 33 26.5 31.5" stroke="#A87650" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.55" />
+      <circle cx="50" cy="62" r="22" fill="#F4D3B3" stroke="#1A1A1A" strokeWidth="1.8" />
+      {/* Cheek blushes */}
+      <circle cx="34" cy="69" r="3.2" fill="#F0A290" opacity="0.7" />
+      <circle cx="66" cy="69" r="3.2" fill="#F0A290" opacity="0.7" />
+      {/* Eyes — simple dots */}
+      <circle
+        cx="44" cy="62" r="1.8"
+        fill="#1A1A1A"
+        className={cn('krystyna-eye', mood === 'idle' && 'krystyna-blink')}
+        style={eyesClosed ? { transform: 'scaleY(0.1)' } : undefined}
+      />
+      <circle
+        cx="56" cy="62" r="1.8"
+        fill="#1A1A1A"
+        className={cn('krystyna-eye', mood === 'idle' && 'krystyna-blink')}
+        style={eyesClosed ? { transform: 'scaleY(0.1)' } : undefined}
+      />
+      {/* Z-shaped brow + nose line on the right side of the face */}
+      <path
+        d="M50 56 Q55 53 60 57 L52 67 Q55 70 60 68"
+        stroke="#1A1A1A"
+        strokeWidth="1.7"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       {/* Mouth */}
-      <path d={mouthD} stroke="#3A2418" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+      <path
+        d={mouthD}
+        stroke="#1A1A1A"
+        strokeWidth="1.6"
+        fill="none"
+        strokeLinecap="round"
+      />
 
       {/* ---------- Helmet ---------- */}
-      {/* Hair peek at sides under helmet (warm brown) */}
-      <path d="M12.5 22 Q12 26 15 28 L15 22 Z" fill="#6B4226" opacity="0.55" />
-      <path d="M39.5 22 Q40 26 37 28 L37 22 Z" fill="#6B4226" opacity="0.55" />
+      {/* Brim back (wider, projects forward) */}
+      <path
+        d="M16 44 Q22 40 28 38 Q40 35 50 35 Q60 35 72 38 Q78 40 84 44 L82 49 Q50 53 18 49 Z"
+        fill="#D8392A"
+        stroke="#1A1A1A"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      {/* Dome */}
+      <path
+        d="M27 41 Q27 19 50 19 Q73 19 73 41 L73 44 L27 44 Z"
+        fill="#D8392A"
+        stroke="#1A1A1A"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      {/* Brim/dome separator line */}
+      <path d="M18 45 Q50 41 82 45" stroke="#1A1A1A" strokeWidth="1.6" fill="none" />
 
-      {/* Helmet brim (sits ON the head, projects forward) */}
+      {/* Cream stripe — sits over the crown, behind the badge */}
       <path
-        d="M5.5 21.5 Q26 17.8 46.5 21.5 L46.5 24.4 Q26 23 5.5 24.4 Z"
-        fill="url(#krystyna-brim)"
+        d="M44 19 Q44 28 43 40 L57 40 Q56 28 56 19 Q53 18.5 50 18.5 Q47 18.5 44 19 Z"
+        fill="#F4D9A8"
+        stroke="#1A1A1A"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
       />
 
-      {/* Helmet dome */}
-      <path
-        d="M8.5 22 Q8.5 5 26 5 Q43.5 5 43.5 22 Z"
-        fill="url(#krystyna-helmet)"
+      {/* Yellow hexagonal badge */}
+      <polygon
+        points="50,30 56.5,33.5 56.5,40.5 50,44 43.5,40.5 43.5,33.5"
+        fill="#F2C633"
+        stroke="#1A1A1A"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
       />
-      {/* Dome highlight (soft top-left sheen) */}
-      <path
-        d="M11 18 Q12 9 22 6 Q15 9 13 19 Z"
-        fill="#FFFFFF"
-        opacity="0.18"
-      />
-      {/* Crest stripe — runs front-to-back over the dome */}
-      <path
-        d="M22.5 5.4 Q22.5 14 22 22 L30 22 Q29.5 14 29.5 5.4 Q26 5 22.5 5.4 Z"
-        fill="#F8DDB0"
-      />
-      {/* Crest stripe inner shadow line */}
-      <path
-        d="M26 5.5 L26 22"
-        stroke="#C9A875"
-        strokeWidth="0.4"
-        opacity="0.6"
-      />
-      {/* Brim front line (separates brim from dome) */}
-      <path d="M5.5 21.6 Q26 18 46.5 21.6" stroke="#5A110B" strokeWidth="0.6" fill="none" />
 
-      {/* Listening pulse — small mic dot near helmet */}
+      {/* White reflective patches */}
+      <rect x="30.5" y="40" width="6" height="2.2" fill="#FFFFFF" stroke="#1A1A1A" strokeWidth="0.9" />
+      <rect x="63.5" y="40" width="6" height="2.2" fill="#FFFFFF" stroke="#1A1A1A" strokeWidth="0.9" />
+
+      {/* ---------- Mood indicators (overlaid, do not modify the face design) ---------- */}
       {mood === 'listening' && (
         <>
-          <circle cx="45" cy="14" r="2.6" fill="#E85B45" />
-          <circle cx="45" cy="14" r="2.6" fill="#E85B45" opacity="0.4" className="motion-safe:animate-ping" />
+          <circle cx="84" cy="22" r="4" fill="#D8392A" stroke="#1A1A1A" strokeWidth="1" />
+          <circle cx="84" cy="22" r="4" fill="#D8392A" opacity="0.4" className="motion-safe:animate-ping" />
         </>
       )}
-      {/* Error pip */}
       {mood === 'error' && (
-        <circle cx="45" cy="14" r="2.6" fill="#B23B2C" />
+        <circle cx="84" cy="22" r="4" fill="#A02619" stroke="#1A1A1A" strokeWidth="1" />
+      )}
+      {mood === 'thinking' && (
+        <g transform="translate(76 18)" className="motion-safe:animate-pulse">
+          <circle r="2.2" fill="#1A1A1A" opacity="0.4" />
+          <circle cx="6" r="2.2" fill="#1A1A1A" opacity="0.6" />
+          <circle cx="12" r="2.2" fill="#1A1A1A" opacity="0.85" />
+        </g>
       )}
     </svg>
   );
@@ -227,37 +244,62 @@ export function AICompanion() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Restore persisted state on mount
+  // Default = safe bottom-right corner, leaves the canvas free
+  const defaultPos = useCallback(() => {
+    if (typeof window === 'undefined') return { x: 24, y: 24 };
+    return { x: window.innerWidth - 80, y: window.innerHeight - 80 };
+  }, []);
+
+  // Restore persisted state on mount + handle viewport resizes
   useEffect(() => {
     voiceSupported.current = !!getSR();
     try {
       const rawPos = localStorage.getItem(STORAGE_LAUNCHER_POS);
+      let next = defaultPos();
       if (rawPos) {
         const parsed = JSON.parse(rawPos);
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          // Clamp into viewport on next frame so we have window dims
-          const clamp = () => {
-            const maxX = Math.max(8, window.innerWidth - 64);
-            const maxY = Math.max(8, window.innerHeight - 64);
-            setPos({ x: Math.min(Math.max(parsed.x, 8), maxX), y: Math.min(Math.max(parsed.y, 8), maxY) });
+        if (Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)) {
+          const maxX = Math.max(8, window.innerWidth - 64);
+          const maxY = Math.max(8, window.innerHeight - 64);
+          next = {
+            x: Math.min(Math.max(parsed.x, 8), maxX),
+            y: Math.min(Math.max(parsed.y, 8), maxY),
           };
-          clamp();
         }
-      } else {
-        // Default bottom-right
-        setPos({ x: typeof window !== 'undefined' ? window.innerWidth - 80 : 24, y: typeof window !== 'undefined' ? window.innerHeight - 80 : 24 });
       }
+      setPos(next);
       const rawSize = localStorage.getItem(STORAGE_PANEL_SIZE);
       if (rawSize === 'compact' || rawSize === 'expanded' || rawSize === 'fullscreen') setSize(rawSize);
       const rawHist = sessionStorage.getItem(STORAGE_HISTORY);
       if (rawHist) {
-        const parsed = JSON.parse(rawHist);
-        if (Array.isArray(parsed)) setMessages(parsed.slice(-20));
+        const parsedHist = JSON.parse(rawHist);
+        if (Array.isArray(parsedHist)) setMessages(parsedHist.slice(-20));
       }
     } catch {
       // ignore corrupt storage
     }
-  }, []);
+
+    // Re-clamp launcher when the viewport shrinks (avoids it landing off-screen
+    // or covering canvas content after layout changes)
+    const onResize = () => {
+      setPos((cur) => {
+        const maxX = Math.max(8, window.innerWidth - 64);
+        const maxY = Math.max(8, window.innerHeight - 64);
+        const nx = Math.min(Math.max(cur.x, 8), maxX);
+        const ny = Math.min(Math.max(cur.y, 8), maxY);
+        return nx === cur.x && ny === cur.y ? cur : { x: nx, y: ny };
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [defaultPos]);
+
+  // Double-click to reset launcher to bottom-right corner
+  const resetPos = useCallback(() => {
+    const fresh = defaultPos();
+    setPos(fresh);
+    try { localStorage.setItem(STORAGE_LAUNCHER_POS, JSON.stringify(fresh)); } catch { /* ignore */ }
+  }, [defaultPos]);
 
   // Persist size + history
   useEffect(() => {
@@ -459,7 +501,8 @@ export function AICompanion() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        title="Krystyna · drag to move · Cmd/Ctrl+J to open"
+        onDoubleClick={resetPos}
+        title="Krystyna · drag to move · double-click to reset position · Cmd/Ctrl+J to open"
         className={cn(
           'fixed z-[60] flex h-14 w-14 cursor-grab select-none items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-shadow hover:shadow-xl',
           dragging && 'cursor-grabbing shadow-2xl',
