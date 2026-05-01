@@ -119,7 +119,8 @@ Extract the full job description as JSON per the system prompt.`;
 
   let extracted: ExtractedJD;
   try {
-    const aiText = await callClaude(SYSTEM_PROMPT, userMessage, 6000);
+    const aiText = await callClaude(SYSTEM_PROMPT, userMessage, 6000,
+      { operation: 'jobs.scrapeExtract', context: { orgId, userId: session!.user.id } });
     const cleanedJson = aiText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
     extracted = JSON.parse(cleanedJson);
   } catch (err: any) {

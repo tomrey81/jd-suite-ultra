@@ -91,23 +91,32 @@ export const PRO_V5_CATEGORY_MAP: ProV5CategoryMapping[] = [
   },
 ];
 
-/**
- * Phase-1 follow-up TODO list (NOT implemented yet):
- *   1. Read apps/web/lib/hypotheses/hypotheses.json
- *   2. For each Pro hypothesis ID, identify the closest Axiomera marker(s)
- *   3. Populate PRO_V5_ITEM_MAP below with verified per-item links
- *   4. Add admin view rendering this mapping for transparency
- */
+// TODO(phase-2): Populate PRO_V5_ITEM_MAP with verified per-item links.
+//
+// What is needed:
+//   1. Read apps/web/lib/hypotheses/hypotheses.json (56 Pro v5 hypothesis IDs).
+//   2. Read ./hypotheses/r-hypotheses.ts (19 R-markers) and
+//      ./hypotheses/e-hypotheses.ts (45 E-markers) for Axiomera keys.
+//   3. For each Pro v5 ID, identify the closest Axiomera marker(s) by comparing
+//      the guidance_en field to the Pro hypothesis description.
+//   4. Record confidence (high / medium / low) and a rationale line.
+//   5. Add an admin comparison view that renders this mapping alongside both
+//      engine outputs so auditors can see provenance.
+//
+// Acceptance criteria (from docs/ultra/13-hypothesis-mapping-followup.md):
+//   - All 56 Pro v5 hypothesis IDs are present as keys in PRO_V5_ITEM_MAP.
+//   - Every entry has ≥1 axiomeraKey OR an explicit note explaining no match.
+//   - No mappings are fabricated: each must cite the guidance_en evidence.
+//   - At least one passing unit test verifies all 56 keys are present.
+//
+// The category-level map above (PRO_V5_CATEGORY_MAP) is sufficient for
+// Phase 1 coexistence. The per-item map is required only when the admin
+// consolidation view (Phase 2 milestone M2.4) is built.
 export const PRO_V5_ITEM_MAP: Record<
   string,
   { axiomeraKeys: string[]; rationale: string; confidence: 'high' | 'medium' | 'low' }
 > = {
-  // To be populated in a follow-up task. Example shape:
-  // 'cog_problem_solving': {
-  //   axiomeraKeys: ['solves_without_precedent', 'beyond_existing_methods'],
-  //   rationale: 'Both detect novel-problem cognitive demand.',
-  //   confidence: 'high',
-  // },
+  // Populated in Phase 2. See TODO above and docs/ultra/13-hypothesis-mapping-followup.md.
 };
 
 /**
