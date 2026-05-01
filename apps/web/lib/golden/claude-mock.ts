@@ -22,6 +22,17 @@ import { R_HYPOTHESES } from '@/lib/axiomera/hypotheses/r-hypotheses';
 import { E_HYPOTHESES } from '@/lib/axiomera/hypotheses/e-hypotheses';
 import type { GoldenFixture } from './types';
 import type { CallAiResult } from '@/lib/ai/call-ai';
+import type { ModelTier } from '@/lib/ai/model-registry';
+
+const MOCK_RESULT_BASE: Omit<CallAiResult, 'text'> = {
+  inputTokens: 0,
+  outputTokens: 0,
+  estimatedCostUsd: 0,
+  durationMs: 0,
+  cacheStatus: 'miss',
+  modelId: 'mock',
+  modelTier: 'standard' as ModelTier,
+};
 
 /**
  * E primary keys that are present in the fixture's expected_hypotheses.
@@ -49,14 +60,7 @@ export function buildRMockResponse(fixture: GoldenFixture): CallAiResult {
     return { key: h.key, active, evidence: active ? safeEvidence : null };
   });
 
-  return {
-    text: JSON.stringify({ activations }),
-    inputTokens: 0,
-    outputTokens: 0,
-    estimatedCostUsd: 0,
-    durationMs: 0,
-    cacheStatus: 'miss' as const,
-  };
+  return { ...MOCK_RESULT_BASE, text: JSON.stringify({ activations }) };
 }
 
 /** Build a mock E-extraction Claude response from fixture hypothesis data. */
@@ -73,12 +77,5 @@ export function buildEMockResponse(fixture: GoldenFixture): CallAiResult {
     return { key: h.key, active, evidence: active ? safeEvidence : null };
   });
 
-  return {
-    text: JSON.stringify({ activations }),
-    inputTokens: 0,
-    outputTokens: 0,
-    estimatedCostUsd: 0,
-    durationMs: 0,
-    cacheStatus: 'miss' as const,
-  };
+  return { ...MOCK_RESULT_BASE, text: JSON.stringify({ activations }) };
 }
