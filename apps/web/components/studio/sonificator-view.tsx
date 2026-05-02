@@ -13,6 +13,7 @@ import {
 import { THEMES, scheduleTheme, themeDuration, type Theme } from '@/lib/studio/themes';
 import { scheduleFskBroadcast, fskDuration, FSK_MAX_CHARS } from '@/lib/studio/fsk';
 import { QRCodeBlock } from '@/components/qr/qr-code';
+import { renderToWav, downloadWav, type ExportTrack } from '@/lib/studio/wav-export';
 import { cn } from '@/lib/utils';
 
 type Tab = 'orchestra' | 'themes' | 'palette';
@@ -65,6 +66,10 @@ export function SonificatorView() {
   const [broadcasting, setBroadcasting] = useState<{ token: string; until: number } | null>(null);
   const [receiverQrOpen, setReceiverQrOpen] = useState(false);
   const receiverQrRef = useRef<HTMLDivElement>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportError, setExportError] = useState<string | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const sourcesRef = useRef<Array<OscillatorNode | AudioBufferSourceNode>>([]);
@@ -328,6 +333,41 @@ export function SonificatorView() {
     window.setTimeout(() => setBroadcasting(null), dur * 1000 + 250);
   };
 
+  const handleExportWav = async () => {
+    if (tracks.length === 0 && !currentTheme) return;
+    setExporting(true);
+    setExportProgress(0);
+    setExportError(null);
+    try {
+      const exportTracks: ExportTrack[] = tracks.map((t) => ({
+        jdId: t.jdId,
+        jobTitle: t.jobTitle,
+        soundType: t.soundType,
+        soundKey: t.soundKey,
+        vol: t.vol,
+        pan: t.pan,
+        scaleKey: t.scaleKey,
+        rootKey: t.rootKey,
+        muted: t.muted,
+        solo: t.solo,
+      }));
+      const result = await renderToWav({
+        tracks: exportTracks,
+        theme: currentTheme,
+        tempo,
+        themeMix,
+        masterVol,
+        onProgress: setExportProgress,
+      });
+      downloadWav(result);
+      setExportOpen(false);
+    } catch (err: unknown) {
+      setExportError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -407,6 +447,16 @@ export function SonificatorView() {
               title="Broadcast a short audible token that another device can decode at /sonification/receiver"
             >
               {broadcasting ? `📡 Broadcasting…` : '📡 Broadcast'}
+            </button>
+
+            {/* Export WAV */}
+            <button
+              onClick={() => setExportOpen(true)}
+              disabled={tracks.length === 0 && !currentTheme}
+              className="rounded-full border border-border-default bg-white px-3 py-1.5 text-[11px] font-medium text-text-secondary transition-colors hover:border-brand-gold hover:text-brand-gold disabled:opacity-40"
+              title="Export orchestra mix as WAV"
+            >
+              ↓ Export WAV
             </button>
 
             {/* Receiver QR popover */}
@@ -712,6 +762,83 @@ export function SonificatorView() {
           )}
         </div>
       </div>
+
+      {/* Export WAV modal */}
+      {exportOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget && !exporting) setExportOpen(false); }}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-border-default bg-white p-6 shadow-2xl">
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-brand-gold">
+              Export
+            </div>
+            <h2 className="font-display text-lg font-semibold text-text-primary">Download WAV</h2>
+            <p className="mt-1 text-[11px] text-text-muted">
+              Renders your orchestra mix offline using OfflineAudioContext — no server, no upload.
+              Stereo 16-bit PCM at 44.1 kHz.
+            </p>
+
+            <div className="mt-4 space-y-2 rounded-lg border border-border-default bg-surface-page px-3 py-2.5 text-[11px] text-text-secondary">
+              <div className="flex justify-between">
+                <span>Tracks</span>
+                <span className="font-medium text-text-primary">{tracks.length}</span>
+              </div>
+              {currentTheme && (
+                <div className="flex justify-between">
+                  <span>Theme</span>
+                  <span className="font-medium text-text-primary">{currentTheme.name}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>Tempo</span>
+                <span className="font-medium text-text-primary">{tempo} BPM</span>
+              </div>
+            </div>
+
+            {exportError && (
+              <div className="mt-3 rounded-md border border-danger/30 bg-danger-bg px-3 py-2 text-[11px] text-danger">
+                {exportError}
+              </div>
+            )}
+
+            {exporting && (
+              <div className="mt-4">
+                <div className="mb-1 flex items-center justify-between text-[10px] text-text-muted">
+                  <span>Rendering…</span>
+                  <span>{exportProgress}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-page">
+                  <div
+                    className="h-full rounded-full bg-brand-gold transition-all duration-200"
+                    style={{ width: `${exportProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                onClick={handleExportWav}
+                disabled={exporting}
+                className="flex-1 rounded-full bg-brand-gold py-2 text-[11px] font-semibold text-white transition-colors hover:bg-brand-gold/90 disabled:opacity-50"
+              >
+                {exporting ? 'Rendering…' : '↓ Download WAV'}
+              </button>
+              <button
+                onClick={() => { if (!exporting) { setExportOpen(false); setExportError(null); } }}
+                disabled={exporting}
+                className="rounded-full border border-border-default px-4 py-2 text-[11px] font-medium text-text-secondary hover:border-brand-gold disabled:opacity-40"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="mt-3 text-center text-[9px] text-text-muted">
+              Audio generated entirely in your browser. Nothing is uploaded.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
