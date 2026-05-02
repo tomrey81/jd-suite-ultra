@@ -19,7 +19,7 @@
  *   Schema + API migration is the next session's job.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -54,6 +54,7 @@ interface PlatformUser {
 }
 
 interface Identity {
+  website: string;
   legalName: string;
   displayName: string;
   countryHq: string;
@@ -144,7 +145,7 @@ const DEFAULT_DATA_SOURCES: DataSourceItem[] = [
 
 const EMPTY_PROFILE: CompanyProfile = {
   identity: {
-    legalName: '', displayName: '', countryHq: 'PL', countriesInScope: '',
+    website: '', legalName: '', displayName: '', countryHq: 'PL', countriesInScope: '',
     industry: '', size: 'medium', totalFte: '', jdsInScope: '',
     mainLanguage: 'English', defaultCurrency: 'EUR', timezone: 'Europe/Warsaw',
   },
@@ -222,7 +223,7 @@ const STORAGE_KEY = 'companyProfile:v1';
 // ─── Completion calculation ────────────────────────────────────────────────
 
 function pctIdentity(i: Identity): number {
-  const fields = [i.legalName, i.countryHq, i.countriesInScope, i.industry, i.totalFte, i.jdsInScope, i.mainLanguage, i.defaultCurrency, i.timezone];
+  const fields = [i.website, i.legalName, i.countryHq, i.countriesInScope, i.industry, i.totalFte, i.jdsInScope, i.mainLanguage, i.defaultCurrency, i.timezone];
   return Math.round((fields.filter(Boolean).length / fields.length) * 100);
 }
 function pctProject(p: ProjectScope): number {
@@ -265,6 +266,8 @@ export default function CompanyPage() {
   const [activeTab, setActiveTab] = useState<TabId>('identity');
   const [hydrated, setHydrated] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Keys in Identity that were auto-filled from website scrape — shown with a review badge
+  const [scrapedFields, setScrapedFields] = useState<Set<keyof Identity>>(new Set());
 
   useEffect(() => {
     try {
@@ -380,7 +383,7 @@ export default function CompanyPage() {
         {/* Tab body */}
         <div className="rounded-lg border border-border-default bg-white p-5">
           {!hydrated && <div className="text-[12px] text-text-muted">Loading…</div>}
-          {hydrated && activeTab === 'identity'   && <IdentityTab v={profile.identity} onChange={updateIdentity} />}
+          {hydrated && activeTab === 'identity'   && <IdentityTab v={profile.identity} onChange={updateIdentity} scrapedFields={scrapedFields} onScrapeApply={(fields) => { updateIdentity(fields); setScrapedFields(new Set(Object.keys(fields) as (keyof Identity)[])); }} />}
           {hydrated && activeTab === 'project'    && <ProjectTab v={profile.project} onChange={updateProject} />}
           {hydrated && activeTab === 'users'      && <UsersTab v={profile.users} onChange={updateUsers} />}
           {hydrated && activeTab === 'jobarch'    && <JobArchTab v={profile.jobArch} onChange={updateJobArch} />}
@@ -404,7 +407,7 @@ export default function CompanyPage() {
 
 const inputCls = 'w-full rounded-md border border-border-default bg-white px-3 py-2 text-[13px] text-text-primary outline-none focus:border-brand-gold';
 
-function Field({ label, required, children, hint }: { label: string; required?: boolean; children: React.ReactNode; hint?: string }) {
+function Field({ label, required, children, hint }: { label: React.ReactNode; required?: boolean; children: React.ReactNode; hint?: string }) {
   return (
     <div className="mb-3">
       <label className="mb-1 block text-[11px] font-semibold text-text-primary">
@@ -452,41 +455,171 @@ function Chips<T extends string>({ value, options, onToggle }: { value: T[]; opt
 
 // ─── Tab: Identity ──────────────────────────────────────────────────────────
 
-function IdentityTab({ v, onChange }: { v: Identity; onChange: (p: Partial<Identity>) => void }) {
+function ScrapedBadge() {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <Card title="Legal & branding" hint="Both names appear on reports — useful when legal entity differs from brand.">
-        <Field label="Legal company name" required><input className={inputCls} value={v.legalName} onChange={(e) => onChange({ legalName: e.target.value })} placeholder="e.g. EUPTD Enterprises Sp. z o.o." /></Field>
-        <Field label="Display / group name"><input className={inputCls} value={v.displayName} onChange={(e) => onChange({ displayName: e.target.value })} placeholder="e.g. EUPTD Group" /></Field>
-        <Field label="Industry / sector"><input className={inputCls} value={v.industry} onChange={(e) => onChange({ industry: e.target.value })} placeholder="e.g. Logistics & Supply Chain" /></Field>
-      </Card>
+    <span className="ml-1.5 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
+      ⚠ scraped · review
+    </span>
+  );
+}
 
-      <Card title="Geography">
-        <Field label="Country (HQ)" required><input className={inputCls} value={v.countryHq} onChange={(e) => onChange({ countryHq: e.target.value })} placeholder="PL / DE / CZ…" /></Field>
-        <Field label="Countries in scope" hint="Comma-separated ISO codes — e.g. PL, CZ, SK, RO, ES"><input className={inputCls} value={v.countriesInScope} onChange={(e) => onChange({ countriesInScope: e.target.value })} placeholder="PL, CZ, SK, RO" /></Field>
-        <Field label="Time zone"><input className={inputCls} value={v.timezone} onChange={(e) => onChange({ timezone: e.target.value })} placeholder="Europe/Warsaw" /></Field>
-      </Card>
+function IdentityTab({
+  v,
+  onChange,
+  scrapedFields,
+  onScrapeApply,
+}: {
+  v: Identity;
+  onChange: (p: Partial<Identity>) => void;
+  scrapedFields: Set<keyof Identity>;
+  onScrapeApply: (fields: Partial<Identity>) => void;
+}) {
+  const [scraping, setScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState('');
+  const [scrapePreview, setScrapePreview] = useState<Partial<Identity> | null>(null);
 
-      <Card title="Size & scale" hint="Drives EIGE pathway selection.">
-        <Field label="Organisation size">
-          <div className="flex flex-wrap gap-1.5">
-            {SIZES.map(({ value, label }) => (
-              <button key={value} type="button" onClick={() => onChange({ size: value })}
-                className={cn('rounded-md border px-3 py-1.5 text-[11px] transition-colors', v.size === value ? 'border-brand-gold bg-brand-gold-lighter text-brand-gold' : 'border-border-default bg-white')}
-              >
-                {label}
+  const handleScrape = async () => {
+    const url = v.website.trim();
+    if (!url) return;
+    setScraping(true);
+    setScrapeError('');
+    setScrapePreview(null);
+    try {
+      const res = await fetch('/api/company/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setScrapeError(data.error || 'Scrape failed'); return; }
+      if (!data.fields || Object.keys(data.fields).length === 0) {
+        setScrapeError('No data could be extracted from this website.');
+        return;
+      }
+      setScrapePreview(data.fields as Partial<Identity>);
+    } catch {
+      setScrapeError('Network error — could not reach the server.');
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  const applyPreview = () => {
+    if (!scrapePreview) return;
+    onScrapeApply(scrapePreview);
+    setScrapePreview(null);
+  };
+
+  const sf = scrapedFields;
+
+  return (
+    <div className="space-y-4">
+      {/* Website scraper — always first */}
+      <div className="rounded-lg border border-brand-gold/30 bg-amber-50/40 p-4">
+        <div className="mb-2 text-[12px] font-semibold text-text-primary">Company website</div>
+        <p className="mb-3 text-[11px] text-text-muted">
+          Enter the URL and click <strong>Analyse</strong> — JD Suite will read the page and pre-fill as many fields as it can find. All scraped values are flagged for your review.
+        </p>
+        <div className="flex gap-2">
+          <input
+            className={cn(inputCls, 'flex-1')}
+            type="url"
+            value={v.website}
+            onChange={(e) => onChange({ website: e.target.value })}
+            placeholder="https://www.yourcompany.com"
+            onKeyDown={(e) => e.key === 'Enter' && handleScrape()}
+          />
+          <button
+            type="button"
+            disabled={!v.website.trim() || scraping}
+            onClick={handleScrape}
+            className="rounded-md bg-brand-gold px-4 py-2 text-[12px] font-medium text-white disabled:opacity-40 hover:bg-brand-gold/90 whitespace-nowrap"
+          >
+            {scraping ? 'Analysing…' : 'Analyse website'}
+          </button>
+        </div>
+
+        {scrapeError && (
+          <div className="mt-2 rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger">{scrapeError}</div>
+        )}
+
+        {scrapePreview && (
+          <div className="mt-3 rounded-md border border-amber-200 bg-white p-3">
+            <div className="mb-2 text-[11px] font-semibold text-amber-700">Found {Object.keys(scrapePreview).length} field{Object.keys(scrapePreview).length !== 1 ? 's' : ''} — review before applying:</div>
+            <ul className="mb-3 space-y-1">
+              {Object.entries(scrapePreview).map(([k, val]) => (
+                <li key={k} className="flex gap-2 text-[11px]">
+                  <span className="w-36 shrink-0 font-medium text-text-muted capitalize">{k.replace(/([A-Z])/g, ' $1')}:</span>
+                  <span className="text-text-primary">{String(val)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <button onClick={applyPreview} className="rounded-md bg-brand-gold px-3 py-1.5 text-[11px] font-medium text-white hover:bg-brand-gold/90">
+                Apply to form
               </button>
-            ))}
+              <button onClick={() => setScrapePreview(null)} className="rounded-md border border-border-default px-3 py-1.5 text-[11px] text-text-muted hover:text-text-primary">
+                Discard
+              </button>
+            </div>
           </div>
-        </Field>
-        <Field label="Total FTE"><input className={inputCls} value={v.totalFte} onChange={(e) => onChange({ totalFte: e.target.value })} placeholder="e.g. 850" /></Field>
-        <Field label="Number of JDs / job roles in scope" hint="More useful than FTE for planning JD work."><input className={inputCls} value={v.jdsInScope} onChange={(e) => onChange({ jdsInScope: e.target.value })} placeholder="e.g. 220" /></Field>
-      </Card>
+        )}
+      </div>
 
-      <Card title="Locale & money">
-        <Field label="Main language of documentation"><input className={inputCls} value={v.mainLanguage} onChange={(e) => onChange({ mainLanguage: e.target.value })} placeholder="English" /></Field>
-        <Field label="Default currency"><input className={inputCls} value={v.defaultCurrency} onChange={(e) => onChange({ defaultCurrency: e.target.value })} placeholder="EUR / PLN / USD" /></Field>
-      </Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card title="Legal & branding" hint="Both names appear on reports — useful when legal entity differs from brand.">
+          <Field label={<>Legal company name{sf.has('legalName') && <ScrapedBadge />}</>} required>
+            <input className={cn(inputCls, sf.has('legalName') && 'border-amber-300')} value={v.legalName} onChange={(e) => onChange({ legalName: e.target.value })} placeholder="e.g. EUPTD Enterprises Sp. z o.o." />
+          </Field>
+          <Field label={<>Display / group name{sf.has('displayName') && <ScrapedBadge />}</>}>
+            <input className={cn(inputCls, sf.has('displayName') && 'border-amber-300')} value={v.displayName} onChange={(e) => onChange({ displayName: e.target.value })} placeholder="e.g. EUPTD Group" />
+          </Field>
+          <Field label={<>Industry / sector{sf.has('industry') && <ScrapedBadge />}</>}>
+            <input className={cn(inputCls, sf.has('industry') && 'border-amber-300')} value={v.industry} onChange={(e) => onChange({ industry: e.target.value })} placeholder="e.g. Logistics & Supply Chain" />
+          </Field>
+        </Card>
+
+        <Card title="Geography">
+          <Field label={<>Country (HQ){sf.has('countryHq') && <ScrapedBadge />}</>} required>
+            <input className={cn(inputCls, sf.has('countryHq') && 'border-amber-300')} value={v.countryHq} onChange={(e) => onChange({ countryHq: e.target.value })} placeholder="PL / DE / CZ…" />
+          </Field>
+          <Field label={<>Countries in scope{sf.has('countriesInScope') && <ScrapedBadge />}</>} hint="Comma-separated ISO codes — e.g. PL, CZ, SK, RO, ES">
+            <input className={cn(inputCls, sf.has('countriesInScope') && 'border-amber-300')} value={v.countriesInScope} onChange={(e) => onChange({ countriesInScope: e.target.value })} placeholder="PL, CZ, SK, RO" />
+          </Field>
+          <Field label={<>Time zone{sf.has('timezone') && <ScrapedBadge />}</>}>
+            <input className={cn(inputCls, sf.has('timezone') && 'border-amber-300')} value={v.timezone} onChange={(e) => onChange({ timezone: e.target.value })} placeholder="Europe/Warsaw" />
+          </Field>
+        </Card>
+
+        <Card title="Size & scale" hint="Drives EIGE pathway selection.">
+          <Field label={<>Organisation size{sf.has('size') && <ScrapedBadge />}</>}>
+            <div className="flex flex-wrap gap-1.5">
+              {SIZES.map(({ value, label }) => (
+                <button key={value} type="button" onClick={() => onChange({ size: value })}
+                  className={cn('rounded-md border px-3 py-1.5 text-[11px] transition-colors', v.size === value ? 'border-brand-gold bg-brand-gold-lighter text-brand-gold' : 'border-border-default bg-white')}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
+          <Field label={<>Total FTE{sf.has('totalFte') && <ScrapedBadge />}</>}>
+            <input className={cn(inputCls, sf.has('totalFte') && 'border-amber-300')} value={v.totalFte} onChange={(e) => onChange({ totalFte: e.target.value })} placeholder="e.g. 850" />
+          </Field>
+          <Field label="Number of JDs / job roles in scope" hint="More useful than FTE for planning JD work.">
+            <input className={inputCls} value={v.jdsInScope} onChange={(e) => onChange({ jdsInScope: e.target.value })} placeholder="e.g. 220" />
+          </Field>
+        </Card>
+
+        <Card title="Locale & money">
+          <Field label={<>Main language of documentation{sf.has('mainLanguage') && <ScrapedBadge />}</>}>
+            <input className={cn(inputCls, sf.has('mainLanguage') && 'border-amber-300')} value={v.mainLanguage} onChange={(e) => onChange({ mainLanguage: e.target.value })} placeholder="English" />
+          </Field>
+          <Field label={<>Default currency{sf.has('defaultCurrency') && <ScrapedBadge />}</>}>
+            <input className={cn(inputCls, sf.has('defaultCurrency') && 'border-amber-300')} value={v.defaultCurrency} onChange={(e) => onChange({ defaultCurrency: e.target.value })} placeholder="EUR / PLN / USD" />
+          </Field>
+        </Card>
+      </div>
     </div>
   );
 }
