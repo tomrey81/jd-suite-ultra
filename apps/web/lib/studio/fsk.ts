@@ -262,6 +262,15 @@ export function createFskDecoder(config: DecoderConfig) {
         }
       } else if (phase === 'receiving') {
         if (isLeadOut) {
+          // Commit the last pending nibble before verifying checksum.
+          // The normal commit path only fires on a nibble *transition*, so the
+          // final nibble before lead-out would otherwise be dropped, making the
+          // checksum always fail (last nibble of the 3-char checksum is missing).
+          if (lastNibble >= 0 && nibbleStableFrames >= 1) {
+            nibbles.push(lastNibble);
+            lastNibble = -1;
+            nibbleStableFrames = 0;
+          }
           // End of message — verify checksum
           const decoded = nibblesToPayload(nibbles);
           if (decoded.length >= 3) {
