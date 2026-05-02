@@ -31,6 +31,7 @@ import { buildRMockResponse, buildEMockResponse } from '@/lib/golden/claude-mock
 import { extractR } from './extract-r';
 import { extractE } from './extract-e';
 import { computeGrade, gradeToBand } from './compose';
+import { deriveLegacyHypothesisFlags } from './legacy-hypothesis-bridge';
 
 // ---------------------------------------------------------------------------
 // Mock callAi — intercept at module level, parameterize per test
@@ -220,6 +221,28 @@ describe('G-7 Golden test harness', () => {
     }
     // Soft assertion — log divergence but don't fail (management markers under-fire in real Claude responses)
     // Harden to hard failure once prompt calibration improves mgmt detection (Goal 3 follow-up)
+
+    // --- LEGACY FLAG DERIVATION (M2.4) ---
+    // Derive legacy flags from engine output and compare against fixture truth.
+    // Soft assertion only: logs divergences per key, does not fail the test.
+    // Note: fixture keys are prefixed `hypo_`; bridge output has bare keys.
+    const derivedFlags = deriveLegacyHypothesisFlags(rResult.active_keys, eResult.active_keys);
+    const legacyDivergences: string[] = [];
+    for (const [hypoKey, oracleValue] of Object.entries(fixture.expected_hypotheses)) {
+      if (!hypoKey.startsWith('hypo_')) continue;
+      const bareKey = hypoKey.replace('hypo_', '');
+      if (!(bareKey in derivedFlags)) continue; // key not in bridge (should not happen)
+      const derivedValue = derivedFlags[bareKey];
+      if (derivedValue !== oracleValue) {
+        legacyDivergences.push(`${bareKey}: derived=${derivedValue} oracle=${oracleValue}`);
+      }
+    }
+    if (legacyDivergences.length > 0) {
+      console.warn(
+        `[golden] ${fixture.id} legacy flag divergences (${legacyDivergences.length}):\n` +
+        legacyDivergences.map((d) => `  ${d}`).join('\n'),
+      );
+    }
   };
 
   // Register individual fixture tests so vitest shows per-fixture results

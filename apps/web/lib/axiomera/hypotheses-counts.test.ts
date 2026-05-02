@@ -8,6 +8,8 @@ import { R_HYPOTHESES } from './hypotheses/r-hypotheses';
 import { E_HYPOTHESES } from './hypotheses/e-hypotheses';
 import { S_POINT_MATRIX } from './hypotheses/s-scale';
 import { WC_BY_ISCO2 } from './hypotheses/wc-scale';
+import { PRO_V5_ITEM_MAP } from './hypothesis-mapping';
+import { deriveLegacyHypothesisFlags } from './legacy-hypothesis-bridge';
 
 describe('R-hypotheses', () => {
   it('contains exactly 19 markers (whitepaper Tables 2, 3, 5, 6)', () => {
@@ -84,6 +86,97 @@ describe('S-scale', () => {
       for (const cell of row) {
         expect(valid.has(cell)).toBe(true);
       }
+    }
+  });
+});
+
+describe('PRO_V5_ITEM_MAP (M2.4 hypothesis unification)', () => {
+  it('contains exactly 55 unique legacy keys (hypotheses.json has 55 unique despite id-54 duplicate)', () => {
+    expect(Object.keys(PRO_V5_ITEM_MAP).length).toBe(55);
+  });
+
+  it('every entry has axiomeraKeys array and rationale', () => {
+    for (const [key, entry] of Object.entries(PRO_V5_ITEM_MAP)) {
+      expect(Array.isArray(entry.axiomeraKeys), `${key}: axiomeraKeys must be array`).toBe(true);
+      expect(entry.rationale.length, `${key}: rationale must be non-empty`).toBeGreaterThan(0);
+      expect(['high', 'medium', 'low'], `${key}: confidence must be high/medium/low`).toContain(entry.confidence);
+    }
+  });
+
+  it('manages_confidential_personal_data has no axiomera keys (no engine analogue)', () => {
+    expect(PRO_V5_ITEM_MAP['manages_confidential_personal_data'].axiomeraKeys).toHaveLength(0);
+    expect(PRO_V5_ITEM_MAP['manages_confidential_personal_data'].confidence).toBe('low');
+  });
+
+  it('all exact-match keys (high confidence) reference axiomera keys that exist in R or E hypotheses', () => {
+    const rKeys = new Set(R_HYPOTHESES.map((h) => h.key));
+    const eKeys = new Set(E_HYPOTHESES.map((h) => h.key));
+    const allAxiomeraKeys = new Set([...rKeys, ...eKeys]);
+
+    for (const [legacyKey, entry] of Object.entries(PRO_V5_ITEM_MAP)) {
+      if (entry.confidence !== 'high') continue;
+      for (const axiomeraKey of entry.axiomeraKeys) {
+        expect(
+          allAxiomeraKeys.has(axiomeraKey),
+          `${legacyKey}: axiomera key "${axiomeraKey}" not found in R or E hypotheses`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+describe('deriveLegacyHypothesisFlags', () => {
+  it('returns all 55 legacy keys', () => {
+    const flags = deriveLegacyHypothesisFlags([], []);
+    expect(Object.keys(flags).length).toBe(55);
+    expect(Object.keys(PRO_V5_ITEM_MAP).sort()).toEqual(Object.keys(flags).sort());
+  });
+
+  it('manages_confidential_personal_data is always false regardless of inputs', () => {
+    const allRKeys = R_HYPOTHESES.map((h) => h.key);
+    const allEKeys = E_HYPOTHESES.map((h) => h.key);
+    const flags = deriveLegacyHypothesisFlags(allRKeys, allEKeys);
+    expect(flags['manages_confidential_personal_data']).toBe(false);
+  });
+
+  it('exact R matches derive from rActiveKeys', () => {
+    const flags = deriveLegacyHypothesisFlags(['no_prior_experience', 'close_supervision'], []);
+    expect(flags['no_prior_experience']).toBe(true);
+    expect(flags['close_supervision']).toBe(true);
+    expect(flags['little_discretion']).toBe(false);
+  });
+
+  it('exact E matches derive from eActiveKeys', () => {
+    const flags = deriveLegacyHypothesisFlags([], ['manages_staff_directly', 'accountable_for_budget']);
+    expect(flags['manages_staff_directly']).toBe(true);
+    expect(flags['accountable_for_budget']).toBe(true);
+    expect(flags['manages_managers']).toBe(false);
+  });
+
+  it('routine_under_supervision requires BOTH close_supervision AND structured_environment', () => {
+    expect(deriveLegacyHypothesisFlags(['close_supervision'], [])['routine_under_supervision']).toBe(false);
+    expect(deriveLegacyHypothesisFlags(['structured_environment'], [])['routine_under_supervision']).toBe(false);
+    expect(deriveLegacyHypothesisFlags(['close_supervision', 'structured_environment'], [])['routine_under_supervision']).toBe(true);
+  });
+
+  it('interaction-derived keys prefer interaction key over fallback primary', () => {
+    // coaches_evaluates_team: interaction key manages_staff_x_coaches > primary manages_staff_directly
+    const withInteraction = deriveLegacyHypothesisFlags([], ['manages_staff_x_coaches']);
+    expect(withInteraction['coaches_evaluates_team']).toBe(true);
+
+    // With fallback only
+    const withPrimary = deriveLegacyHypothesisFlags([], ['manages_staff_directly']);
+    expect(withPrimary['coaches_evaluates_team']).toBe(true);
+
+    // Without either
+    const withNeither = deriveLegacyHypothesisFlags([], []);
+    expect(withNeither['coaches_evaluates_team']).toBe(false);
+  });
+
+  it('all flags are false when no keys are active', () => {
+    const flags = deriveLegacyHypothesisFlags([], []);
+    for (const [key, value] of Object.entries(flags)) {
+      expect(value, `${key} should be false with empty inputs`).toBe(false);
     }
   });
 });
