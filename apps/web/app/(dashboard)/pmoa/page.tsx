@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
+const COMPANY_STORAGE_KEY = 'companyProfile:v1';
+
 interface DocRow {
   id: string;
   name: string;
@@ -32,6 +34,13 @@ const VALIDITY_LABEL: Record<DocRow['validityFlag'], string> = {
 const inputCls =
   'rounded-md border border-border-default bg-white px-3 py-[7px] font-body text-xs text-text-primary outline-none';
 
+interface ScrapeOrgResult {
+  departments: number;
+  positions: number;
+  skipped: number;
+  url: string;
+}
+
 export default function PmoaDashboardPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [docs, setDocs] = useState<DocRow[]>([]);
@@ -39,6 +48,42 @@ export default function PmoaDashboardPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [tagModal, setTagModal] = useState<DocRow | null>(null);
+
+  // Company Profile connection — read website URL from shared localStorage
+  const [companyWebsite, setCompanyWebsite] = useState<string>('');
+  const [scraping, setScraping] = useState(false);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [scrapeResult, setScrapeResult] = useState<ScrapeOrgResult | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COMPANY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setCompanyWebsite(parsed?.identity?.website || '');
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  async function scrapeOrg() {
+    const url = companyWebsite.trim();
+    if (!url) return;
+    setScraping(true); setScrapeError(null); setScrapeResult(null);
+    try {
+      const res = await fetch('/api/pmoa/scrape-org', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setScrapeError(data.error || 'Scrape failed'); return; }
+      setScrapeResult(data);
+    } catch {
+      setScrapeError('Network error — could not reach the server.');
+    } finally {
+      setScraping(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -120,6 +165,59 @@ export default function PmoaDashboardPage() {
               Processes →
             </Link>
           </div>
+        </div>
+
+        {/* Org scrape — connected to Company Profile website */}
+        <div className="my-5 rounded-lg border border-brand-gold/30 bg-amber-50/40 p-4">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-[12px] font-semibold text-text-primary">Scrape org structure from website</span>
+              <span className="ml-2 text-[10px] text-text-muted">Reads your corporate website and imports departments + positions as draft nodes</span>
+            </div>
+            <Link href="/company" className="shrink-0 text-[10px] text-brand-gold hover:underline">
+              Company Profile →
+            </Link>
+          </div>
+
+          {!companyWebsite ? (
+            <div className="mt-2 flex items-center gap-3 rounded-md border border-dashed border-brand-gold/40 bg-white px-4 py-3">
+              <span className="text-[12px] text-text-muted">No website set.</span>
+              <Link href="/company" className="rounded-md bg-brand-gold px-3 py-1.5 text-[11px] font-medium text-white hover:bg-brand-gold/90">
+                Set website in Company Profile →
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center gap-3">
+              <div className="flex-1 rounded-md border border-border-default bg-white px-3 py-2 text-[12px] text-text-muted truncate">
+                {companyWebsite}
+              </div>
+              <button
+                type="button"
+                disabled={scraping}
+                onClick={scrapeOrg}
+                className="shrink-0 rounded-md bg-brand-gold px-4 py-2 text-[12px] font-medium text-white disabled:opacity-40 hover:bg-brand-gold/90"
+              >
+                {scraping ? 'Scraping…' : 'Scrape org structure'}
+              </button>
+            </div>
+          )}
+
+          {scrapeError && (
+            <div className="mt-2 rounded-md bg-danger-bg px-3 py-2 text-[11px] text-danger">{scrapeError}</div>
+          )}
+
+          {scrapeResult && (
+            <div className="mt-2 flex items-center gap-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+              <span className="text-[11px] font-semibold text-emerald-700">
+                Done — {scrapeResult.departments} department{scrapeResult.departments !== 1 ? 's' : ''}, {scrapeResult.positions} position{scrapeResult.positions !== 1 ? 's' : ''} added
+                {scrapeResult.skipped > 0 && ` · ${scrapeResult.skipped} skipped (already exist)`}
+              </span>
+              <span className="text-[10px] text-emerald-600">All scraped nodes are marked for review in the org map.</span>
+              <Link href="/pmoa/org" className="ml-auto shrink-0 rounded-md border border-emerald-400 px-3 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">
+                View org map →
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* KPIs */}
