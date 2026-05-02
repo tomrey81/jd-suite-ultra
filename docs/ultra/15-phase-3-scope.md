@@ -228,7 +228,65 @@ Goal 1 → Goal 3 → Goal 4 → Goal 2
 ╚══════════════════════════════════════════════════════════════════╝
 ```
 
-### Phase 3 baseline (real Claude responses) — PENDING
+### Phase 3 baseline (real Claude responses) — captured 2026-05-02, model: claude-sonnet-4-6
 
-To be filled after Tomasz runs `capture-golden-claude-responses.ts` with a valid
-`ANTHROPIC_API_KEY` and re-runs `pnpm test:golden`.
+```
+╔══════════════════════════════════════════════════════════════════╗
+║              G-7 BASELINE REPORT — engine vs oracle             ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Zone match:  2/15 (13%)  Band match: 2/15 (13%)                ║
+║  Borderline fixtures: 4                                         ║
+╠══════════════════════════════════════════════════════════════════╣
+║  ID    Title                         Z↑  Ze  Band↑ Bande  Match ║
+║  G-01  forklift operator             1   2   A1    A2     ✗✗   ║
+║  G-02  Pharmacy Aides                1   3   A1    A2     ✗✗   ║
+║  G-03  ski lift operator             2   3   A2    A2     ✗✓   ║
+║  G-04  automated optical inspection  2   3   A2    A2     ✗✓   ║
+║  G-05  aesthetician                  3   3   B1    A2     ✓✗   ║
+║  G-06  train driver                  3   4   B1    A3     ✗✗   ║
+║  G-07  sexual violence counsellor    4   5   B2    A5     ✗✗   ║
+║  G-08  Principal Solicitor           5   6   C1    A5     ✗✗   ║
+║  G-09  Head of Rail Reform Analysis  5   6   C1    A5     ✗✗   ║
+║  G-10  Head of Service Design        6   6   C2    A5     ✓✗   ║
+║  G-11  Head of Innovation, Science   6   7   C2    B2     ✗✗   ║
+║  G-12  Legal Adviser to Chancellor   7   6   D1    A5     ✗✗   ║
+║  G-13  Assistant Director Procure.   7   6   D1    A5     ✗✗   ║
+║  G-14  Chief Executives              8   7   D2    B3     ✗✗   ║
+║  G-15  Associate General Counsel     9   6   E     A5     ✗✗   ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+#### Failure analysis
+
+**Zone divergence pattern (13 of 15 fail):**
+- Low zones (1–3): engine **over-fires** — Claude activates mid-level R-markers in simple
+  roles (G-01 forklift: engine=2 vs oracle=1; G-02 pharmacy: engine=3 vs oracle=1)
+- Mid zones (4–6): engine **over-fires by 1** consistently (G-06 train driver engine=4 vs 3;
+  G-07 counsellor engine=5 vs 4; G-08 solicitor engine=6 vs 5)
+- High zones (7–9): engine **under-fires** — Claude misses high-level markers (G-15 legal
+  counsel engine=6 vs oracle=9, a 3-zone gap; G-12, G-13 engine=6 vs oracle=7)
+- **Root cause hypothesis:** Claude over-activates `general_direction` (mid-level marker,
+  m_zone≈5) in JDs that mention any supervisory language, and under-activates
+  `influences_industry` / `org_wide_impact` / `sets_enterprise_vision` in senior roles
+  where JD language is formal rather than explicit.
+
+**R-key missing assertion failures (G-05, G-10):**
+- Both fail on `general_direction` — oracle marks it true for aesthetician (zone 3) and
+  Head of Service Design (zone 6), but Claude does not activate it.
+- These are assertion failures from the fixture-truth check (not zone mismatch), meaning
+  the fixture expects `general_direction=true` but Claude returns it false.
+
+**Band scores all clustering at A2/A5:**
+- Expected: S=90 (S2) default inflates all grades toward lower bands.
+- E interaction markers all default to false (no E-interaction captures).
+- **Goal 4 (Edu/Exp) is critical** to make band assertions meaningful.
+
+#### What this tells us for next steps
+
+| Finding | Action |
+|---------|--------|
+| Engine over-fires for zones 1–3 | Revisit R-hypothesis `m_zone` weights for low-level markers; `structured_assignments` / `close_supervision` activating too broadly |
+| Engine under-fires for zones 7–9 | Prompt engineering: add more concrete examples for `org_wide_impact`, `member_executive_committee`, `sets_enterprise_vision` |
+| `general_direction` inconsistency | Audit guidance_en for this key; Claude's interpretation diverges from oracle in both directions |
+| Bands all A2/A5 | Goal 4 (Edu/Exp on fixtures) must be done before band match is meaningful |
+| Systematic +1 zone bias for mid-range | Consider floor/ceiling adjustment in `computeWeightedZone` or tighter activation thresholds |
