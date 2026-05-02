@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter @jd-suite/db generate && pnpm --filter web build",
+  "buildCommand": "pnpm --filter @jd-suite/db generate && pnpm --filter @jd-suite/db exec prisma db push --accept-data-loss && pnpm --filter web build",
   "outputDirectory": "apps/web/.next",
   "framework": "nextjs",
   "regions": ["cdg1"]
