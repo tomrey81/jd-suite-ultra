@@ -55,6 +55,9 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Phase 3 — user preferences
+  preferredLanguage String? // ISO-639-1 code, e.g. "pl" — synced from settings on save
+
   memberships      Membership[]
   ownedJDs         JobDescription[] @relation("JDOwner")
   jdVersions       JDVersion[]
@@ -76,6 +79,9 @@ model User {
   jdqRunsCreated    JdqRun[]      @relation("JdqRunCreator")
   jdqProgramsCreated JdqProgram[] @relation("JdqProgramCreator")
   jdqProgramsSealed  JdqProgram[] @relation("JdqProgramSealer")
+
+  // Phase 3 — Companion
+  companionRequests CompanionRequest[]
 
   @@map("users")
 }
@@ -1061,6 +1067,27 @@ model ApprovalRecord {
   @@index([jdVersionId])
   @@index([toStage])
   @@map("approval_records")
+}
+
+// ── Companion Request Log (Phase 3) ──────────────────────────────────────────
+//
+// Stores saved AI Companion exchanges so users can retrieve past analyses,
+// draft outputs, and task lists without relying on session storage.
+
+model CompanionRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  orgId     String?
+  prompt    String   @db.Text // user's message
+  reply     String   @db.Text // companion's response
+  context   Json     @default("{}") // pathname, selectedJD, locale etc.
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([orgId])
+  @@map("companion_requests")
 }
 
 // ── Intake Session + Project Readiness (Phase 3 use; Phase 1 schema only) ────

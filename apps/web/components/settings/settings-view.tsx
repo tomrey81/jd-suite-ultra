@@ -487,6 +487,19 @@ export function SettingsView() {
               Save Settings
             </button>
             {saved && <span className="text-xs text-success">Settings saved.</span>}
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Reset all settings to their defaults? This cannot be undone.')) {
+                  setSettings(DEFAULTS);
+                  setSaved(false);
+                }
+              }}
+              className="rounded-full border border-border-default px-4 py-2 text-xs font-medium text-text-muted transition-colors hover:border-danger hover:text-danger"
+            >
+              Reset to defaults
+            </button>
           </div>
 
           <div className="pb-8 text-[10px] text-text-muted">

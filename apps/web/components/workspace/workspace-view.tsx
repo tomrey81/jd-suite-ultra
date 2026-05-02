@@ -355,6 +355,37 @@ export function WorkspaceView({ jds: initialJds, templates }: WorkspaceViewProps
             </Link>
           </div>
 
+          {/* Status quality bar — visible in All JDs view when there are JDs */}
+          {viewMode === 'all' && active.length > 0 && (
+            <div className="flex shrink-0 items-center gap-4 border-b border-border-default bg-surface-page px-4 py-1.5">
+              {STATUS_OPTIONS.map((s) => {
+                const count = active.filter((j) => j.status === s).length;
+                if (count === 0) return null;
+                const c = STATUS_COLORS[s];
+                return (
+                  <div key={s} className="flex items-center gap-1.5">
+                    <div className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.dot}`} />
+                    <span className={`text-[11px] ${c.text}`}>{c.label}</span>
+                    <span className="text-[11px] font-semibold text-text-primary">{count}</span>
+                  </div>
+                );
+              })}
+              <div className="flex-1" />
+              {(() => {
+                const approved = active.filter((j) => j.status === 'APPROVED').length;
+                const rate = Math.round((approved / active.length) * 100);
+                return (
+                  <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
+                    <span>Approved</span>
+                    <span className={`font-semibold ${rate >= 75 ? 'text-success' : rate >= 40 ? 'text-warning' : 'text-danger'}`}>
+                      {rate}%
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* Bulk action bar — slides in when items selected */}
           {selected.size > 0 && (
             <div className="flex shrink-0 items-center gap-2 border-b border-border-default bg-brand-gold-lighter px-4 py-2">

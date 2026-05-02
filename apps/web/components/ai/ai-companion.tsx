@@ -329,6 +329,9 @@ export function AICompanion() {
   const [companionName, setCompanionName] = useState('Krystyna');
   const [companionAvatar, setCompanionAvatar] = useState('default');
 
+  // Saved exchanges (set of assistant message indices that have been saved)
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+
   // Voice
   const [recording, setRecording] = useState(false);
   const recRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -487,6 +490,7 @@ export function AICompanion() {
         const ctx = {
           pathname,
           locale: typeof navigator !== 'undefined' ? navigator.language : undefined,
+          companionName,
           selectedJD: jdId
             ? {
                 id: jdId,
@@ -528,6 +532,22 @@ export function AICompanion() {
     },
     [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore],
   );
+
+  const saveExchange = useCallback(async (assistantIdx: number) => {
+    const reply = messages[assistantIdx]?.content;
+    const prompt = [...messages].slice(0, assistantIdx).reverse().find((m) => m.role === 'user')?.content;
+    if (!prompt || !reply) return;
+    try {
+      await fetch('/api/companion/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, reply, context: { pathname } }),
+      });
+      setSavedIndices((prev) => new Set([...prev, assistantIdx]));
+    } catch {
+      // silent — saving is best-effort
+    }
+  }, [messages, pathname]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const mod = e.metaKey || e.ctrlKey;
@@ -699,16 +719,32 @@ export function AICompanion() {
           </div>
         )}
         {messages.map((m, i) => (
-          <div
-            key={i}
-            className={cn(
-              'max-w-[88%] whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-relaxed',
-              m.role === 'user'
-                ? 'ml-auto bg-brand-gold/10 text-text-primary'
-                : 'bg-surface-page text-text-secondary',
+          <div key={i} className={cn('group flex flex-col', m.role === 'user' ? 'items-end' : 'items-start')}>
+            <div
+              className={cn(
+                'max-w-[88%] whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-relaxed',
+                m.role === 'user'
+                  ? 'bg-brand-gold/10 text-text-primary'
+                  : 'bg-surface-page text-text-secondary',
+              )}
+            >
+              {m.content}
+            </div>
+            {m.role === 'assistant' && (
+              <button
+                onClick={() => saveExchange(i)}
+                disabled={savedIndices.has(i)}
+                className={cn(
+                  'mt-0.5 text-[9px] transition-colors',
+                  savedIndices.has(i)
+                    ? 'cursor-default text-success'
+                    : 'text-text-muted opacity-0 hover:text-brand-gold group-hover:opacity-100',
+                )}
+                title={savedIndices.has(i) ? 'Saved' : 'Save this exchange'}
+              >
+                {savedIndices.has(i) ? '✓ Saved' : '⊕ Save'}
+              </button>
             )}
-          >
-            {m.content}
           </div>
         ))}
         {loading && (
