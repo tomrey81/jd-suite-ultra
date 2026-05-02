@@ -38,8 +38,7 @@
     "noAccount": "Don't have an account?",
     "hasAccount": "Already have an account?",
     "changeKey": "Change API Key",
-    "invalidCredentials": "Invalid email or password",
-    "magicLink": "Send magic link"
+    "invalidCredentials": "Invalid email or password"
   },
   "nav": {
     "workspace": "Workspace",

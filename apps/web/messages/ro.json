@@ -38,8 +38,7 @@
     "noAccount": "Nu aveți cont?",
     "hasAccount": "Aveți deja cont?",
     "changeKey": "Schimbă cheia API",
-    "invalidCredentials": "Adresă de e-mail sau parolă incorectă",
-    "magicLink": "Trimite link de autentificare"
+    "invalidCredentials": "Adresă de e-mail sau parolă incorectă"
   },
   "nav": {
     "workspace": "Spațiu de lucru",

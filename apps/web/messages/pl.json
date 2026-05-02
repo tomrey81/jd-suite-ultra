@@ -38,8 +38,7 @@
     "noAccount": "Nie masz konta?",
     "hasAccount": "Masz już konto?",
     "changeKey": "Zmień klucz API",
-    "invalidCredentials": "Nieprawidłowy adres e-mail lub hasło",
-    "magicLink": "Wyślij link logowania"
+    "invalidCredentials": "Nieprawidłowy adres e-mail lub hasło"
   },
   "nav": {
     "workspace": "Przestrzeń robocza",

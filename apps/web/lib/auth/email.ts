@@ -84,35 +84,3 @@ ${APP_URL}`,
 </div>`,
 };
 
-export const MagicLinkEmail = {
-  subject: 'JD Suite — your sign-in link',
-  text: (link: string) =>
-    `Hi,
-
-Click the link below to sign in to JD Suite:
-
-${link}
-
-This link expires in 15 minutes and can be used once. If you didn't request it, ignore this email.
-
-— JD Suite, built by Tomasz Rey
-${APP_URL}`,
-  html: (link: string) => `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 540px; margin: 0 auto; padding: 24px; background:#FAF7F2; color:#1A1A1A;">
-  <div style="font-family: Georgia, serif; font-size: 24px; font-weight: 600; margin-bottom: 8px;">JD Suite</div>
-  <p style="font-size: 14px; line-height: 1.6;">
-    Click below to sign in. No password needed.
-  </p>
-  <p style="margin: 28px 0;">
-    <a href="${link}" style="display: inline-block; background: #8A7560; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500;">Sign in →</a>
-  </p>
-  <p style="font-size: 12px; color: #55524A; line-height: 1.5;">
-    This link expires in 15 minutes and can be used once. If you didn't request it, ignore this email.<br />
-    Or copy and paste this URL: <span style="word-break:break-all;">${link}</span>
-  </p>
-  <hr style="border: 0; border-top: 1px solid #E0DBD4; margin: 24px 0;" />
-  <p style="font-size: 11px; color: #8A7560;">
-    Built by <a href="https://www.linkedin.com/in/tomaszrey" style="color: #8A7560;">Tomasz Rey</a>
-  </p>
-</div>`,
-};

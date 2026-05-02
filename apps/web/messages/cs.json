@@ -38,8 +38,7 @@
     "noAccount": "Nemáte účet?",
     "hasAccount": "Již máte účet?",
     "changeKey": "Změnit API klíč",
-    "invalidCredentials": "Neplatná e-mailová adresa nebo heslo",
-    "magicLink": "Odeslat přihlašovací odkaz"
+    "invalidCredentials": "Neplatná e-mailová adresa nebo heslo"
   },
   "nav": {
     "workspace": "Pracovní prostor",
