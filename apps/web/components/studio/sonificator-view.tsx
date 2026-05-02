@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
   INSTRUMENTS,
   NATURE_SOUNDS,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/studio/engine';
 import { THEMES, scheduleTheme, themeDuration, type Theme } from '@/lib/studio/themes';
 import { scheduleFskBroadcast, fskDuration, FSK_MAX_CHARS } from '@/lib/studio/fsk';
+import { QRCodeBlock } from '@/components/qr/qr-code';
 import { cn } from '@/lib/utils';
 
 type Tab = 'orchestra' | 'themes' | 'palette';
@@ -62,6 +63,8 @@ export function SonificatorView() {
   const [themeMix, setThemeMix] = useState(0.25); // 0..1 — theme volume vs orchestra
   const [masterVol, setMasterVol] = useState(0.8); // 0..1
   const [broadcasting, setBroadcasting] = useState<{ token: string; until: number } | null>(null);
+  const [receiverQrOpen, setReceiverQrOpen] = useState(false);
+  const receiverQrRef = useRef<HTMLDivElement>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const sourcesRef = useRef<Array<OscillatorNode | AudioBufferSourceNode>>([]);
@@ -173,6 +176,23 @@ export function SonificatorView() {
     if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
     if (ctxRef.current) { try { ctxRef.current.close(); } catch { /* ignore */ } }
   }, []);
+
+  // Close receiver QR popover on click-outside or Escape
+  useEffect(() => {
+    if (!receiverQrOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setReceiverQrOpen(false); };
+    const onMouse = (e: MouseEvent) => {
+      if (receiverQrRef.current && !receiverQrRef.current.contains(e.target as Node)) {
+        setReceiverQrOpen(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onMouse);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onMouse);
+    };
+  }, [receiverQrOpen]);
 
   /**
    * Play the orchestra: each track plays its assigned sound for the JD title text,
@@ -388,6 +408,41 @@ export function SonificatorView() {
             >
               {broadcasting ? `📡 Broadcasting…` : '📡 Broadcast'}
             </button>
+
+            {/* Receiver QR popover */}
+            <div ref={receiverQrRef} className="relative">
+              <button
+                onClick={() => setReceiverQrOpen((v) => !v)}
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors',
+                  receiverQrOpen
+                    ? 'border-brand-gold bg-brand-gold/10 text-brand-gold'
+                    : 'border-border-default bg-white text-text-secondary hover:border-brand-gold hover:text-brand-gold',
+                )}
+                title="Open Receiver page on another device"
+              >
+                ⊞ Receiver QR
+              </button>
+              {receiverQrOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-border-default bg-white shadow-xl">
+                  <div className="border-b border-border-default px-4 py-2.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-brand-gold">Receiver</div>
+                    <p className="mt-0.5 text-[10px] text-text-muted">
+                      Open this page on another device to decode the FSK broadcast.
+                    </p>
+                  </div>
+                  <div className="p-3">
+                    <QRCodeBlock
+                      url={typeof window !== 'undefined' ? `${window.location.origin}/sonification/receiver` : '/sonification/receiver'}
+                      title="Sonification Receiver"
+                      size={160}
+                      fileName="jd-suite-receiver"
+                      className="w-full border-0 p-0"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

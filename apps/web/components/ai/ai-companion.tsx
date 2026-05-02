@@ -29,6 +29,53 @@ type Mood = 'idle' | 'thinking' | 'listening' | 'error';
 const STORAGE_LAUNCHER_POS = 'krystyna:launcher:pos';
 const STORAGE_PANEL_SIZE = 'krystyna:panel:size';
 const STORAGE_HISTORY = 'krystyna:history';
+const STORAGE_SETTINGS = 'jdgc_settings';
+
+interface CompanionSettings {
+  name: string;
+  avatar: string;
+  locale: string;
+  voiceLang: string;
+  notionToken: string;
+  notionWorkerUrl: string;
+  notionParentPageId: string;
+}
+
+/** Read companion settings from shared jdgc_settings localStorage key. */
+function loadCompanionSettings(): CompanionSettings {
+  const defaults: CompanionSettings = { name: 'Krystyna', avatar: 'default', locale: 'en', voiceLang: 'auto', notionToken: '', notionWorkerUrl: '', notionParentPageId: '' };
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const raw = localStorage.getItem(STORAGE_SETTINGS);
+    if (!raw) return defaults;
+    const p = JSON.parse(raw);
+    return {
+      name: (typeof p.companionName === 'string' && p.companionName.trim()) ? p.companionName.trim() : 'Krystyna',
+      avatar: typeof p.companionAvatar === 'string' ? p.companionAvatar : 'default',
+      locale: typeof p.interfaceLanguage === 'string' ? p.interfaceLanguage : 'en',
+      voiceLang: typeof p.voiceLang === 'string' ? p.voiceLang : 'auto',
+      notionToken: typeof p.notionToken === 'string' ? p.notionToken : '',
+      notionWorkerUrl: typeof p.workerUrl === 'string' ? p.workerUrl : '',
+      notionParentPageId: typeof p.notionParentPageId === 'string' ? p.notionParentPageId : '',
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+type JDSummary = { id: string; jobTitle?: string | null; status?: string };
+
+async function fetchJDList(): Promise<JDSummary[]> {
+  try {
+    const res = await fetch('/api/jd');
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return (data as JDSummary[]).slice(0, 30).map((j) => ({ id: j.id, jobTitle: j.jobTitle, status: j.status }));
+  } catch {
+    return [];
+  }
+}
 
 const QUICK_ACTIONS = [
   'Is this JD ready for pay equity evaluation?',
@@ -217,6 +264,78 @@ function KrystynaAvatar({ mood = 'idle', size = 36 }: { mood?: Mood; size?: numb
   );
 }
 
+/**
+ * Renders the companion avatar: custom uploaded image, a prebuilt emoji face,
+ * or the default Krystyna SVG. Falls back to Krystyna on error.
+ */
+function CompanionAvatar({
+  avatarSetting,
+  mood = 'idle',
+  size = 36,
+}: {
+  avatarSetting: string;
+  mood?: Mood;
+  size?: number;
+}) {
+  if (avatarSetting.startsWith('custom:')) {
+    const src = avatarSetting.replace('custom:', '');
+    return (
+      <img
+        src={src}
+        alt="AI companion"
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+      />
+    );
+  }
+  if (avatarSetting === 'assistant') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-label="AI companion" className="shrink-0">
+        <circle cx="50" cy="50" r="48" fill="#E8F0FE" stroke="#1A1A1A" strokeWidth="2.4" />
+        <rect x="28" y="30" width="44" height="32" rx="8" fill="#4A7DFF" stroke="#1A1A1A" strokeWidth="2" />
+        <circle cx="38" cy="46" r="5" fill="#FFFFFF" />
+        <circle cx="62" cy="46" r="5" fill="#FFFFFF" />
+        <rect x="44" y="62" width="12" height="4" rx="2" fill="#1A1A1A" />
+        <rect x="46" y="22" width="8" height="10" rx="4" fill="#4A7DFF" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="50" cy="20" r="3" fill="#F2C633" stroke="#1A1A1A" strokeWidth="1.2" />
+      </svg>
+    );
+  }
+  if (avatarSetting === 'advisor') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-label="AI companion" className="shrink-0">
+        <circle cx="50" cy="50" r="48" fill="#FEF3E8" stroke="#1A1A1A" strokeWidth="2.4" />
+        <ellipse cx="50" cy="55" rx="26" ry="28" fill="#C8935A" stroke="#1A1A1A" strokeWidth="2" />
+        <ellipse cx="34" cy="48" rx="10" ry="13" fill="#C8935A" stroke="#1A1A1A" strokeWidth="1.5" />
+        <ellipse cx="66" cy="48" rx="10" ry="13" fill="#C8935A" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="42" cy="54" r="6" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="58" cy="54" r="6" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="42" cy="54" r="3" fill="#1A1A1A" />
+        <circle cx="58" cy="54" r="3" fill="#1A1A1A" />
+        <path d="M44 66 Q50 70 56 66" stroke="#1A1A1A" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (avatarSetting === 'analyst') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-label="AI companion" className="shrink-0">
+        <circle cx="50" cy="50" r="48" fill="#F0FDF4" stroke="#1A1A1A" strokeWidth="2.4" />
+        <circle cx="50" cy="52" r="26" fill="#5CB85C" stroke="#1A1A1A" strokeWidth="2" />
+        <rect x="35" y="44" width="30" height="3" rx="1.5" fill="#FAFAF7" />
+        <rect x="38" y="51" width="24" height="3" rx="1.5" fill="#FAFAF7" />
+        <rect x="41" y="58" width="18" height="3" rx="1.5" fill="#FAFAF7" />
+        <rect x="42" y="24" width="16" height="22" rx="4" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="50" cy="35" r="4" fill="#5CB85C" />
+      </svg>
+    );
+  }
+  // Default: Krystyna
+  return <KrystynaAvatar mood={mood} size={size} />;
+}
+
 export function AICompanion() {
   const pathname = usePathname();
   const { jdId, jd, dqsScore, ersScore } = useJDStore();
@@ -236,6 +355,25 @@ export function AICompanion() {
   const [errorState, setErrorState] = useState<{ message: string; code: string } | null>(null);
   const [mood, setMood] = useState<Mood>('idle');
 
+  // Companion identity (read from settings localStorage on mount)
+  const [companionName, setCompanionName] = useState('Krystyna');
+  const [companionAvatar, setCompanionAvatar] = useState('default');
+  const [companionLocale, setCompanionLocale] = useState('en');
+  const [voiceLang, setVoiceLang] = useState('auto');
+
+  // JD workspace list (fetched lazily on first open)
+  const [jdList, setJdList] = useState<JDSummary[]>([]);
+
+  // Notion integration
+  const [notionSettings, setNotionSettings] = useState<{ token: string; workerUrl: string; parentPageId: string } | null>(null);
+  const [notionSearchQuery, setNotionSearchQuery] = useState('');
+  const [notionSearchOpen, setNotionSearchOpen] = useState(false);
+  const [notionSearching, setNotionSearching] = useState(false);
+  const [savingToNotion, setSavingToNotion] = useState(false);
+
+  // Saved exchanges (set of assistant message indices that have been saved)
+  const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+
   // Voice
   const [recording, setRecording] = useState(false);
   const recRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -253,6 +391,15 @@ export function AICompanion() {
   // Restore persisted state on mount + handle viewport resizes
   useEffect(() => {
     voiceSupported.current = !!getSR();
+    // Load companion settings from localStorage
+    const cs = loadCompanionSettings();
+    setCompanionName(cs.name);
+    setCompanionAvatar(cs.avatar);
+    setCompanionLocale(cs.locale);
+    setVoiceLang(cs.voiceLang);
+    if (cs.notionToken && cs.notionWorkerUrl) {
+      setNotionSettings({ token: cs.notionToken, workerUrl: cs.notionWorkerUrl, parentPageId: cs.notionParentPageId });
+    }
     try {
       const rawPos = localStorage.getItem(STORAGE_LAUNCHER_POS);
       let next = defaultPos();
@@ -318,6 +465,80 @@ export function AICompanion() {
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
+
+  // Fetch JD list on first open (used to give Krystyna workspace awareness)
+  useEffect(() => {
+    if (!open || jdList.length > 0) return;
+    fetchJDList().then(setJdList);
+  }, [open, jdList.length]);
+
+  // Notion: search workspace pages
+  const searchNotion = useCallback(async () => {
+    if (!notionSettings || !notionSearchQuery.trim()) return;
+    setNotionSearching(true);
+    try {
+      const res = await fetch(notionSettings.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: 'POST', path: 'search', token: notionSettings.token,
+          body: { query: notionSearchQuery.trim(), filter: { property: 'object', value: 'page' }, page_size: 5 },
+        }),
+      });
+      const data = await res.json();
+      const results: Array<Record<string, unknown>> = data.results || [];
+      const summary = results.length === 0
+        ? `No Notion pages found for "${notionSearchQuery}".`
+        : `Notion search: "${notionSearchQuery}" — ${results.length} page(s) found:\n${results.map((p) => {
+            const props = p.properties as Record<string, { title?: Array<{ plain_text?: string }> }> | undefined;
+            const title = props?.title?.title?.[0]?.plain_text || props?.Name?.title?.[0]?.plain_text || 'Untitled';
+            return `- ${title}`;
+          }).join('\n')}`;
+      setMessages((prev) => [...prev, { role: 'assistant', content: summary }]);
+      setNotionSearchQuery('');
+      setNotionSearchOpen(false);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Notion search failed: ${err instanceof Error ? err.message : 'Network error'}` }]);
+    } finally {
+      setNotionSearching(false);
+    }
+  }, [notionSettings, notionSearchQuery]);
+
+  // Notion: save conversation as a page
+  const saveToNotion = useCallback(async () => {
+    if (!notionSettings || messages.length === 0 || savingToNotion) return;
+    setSavingToNotion(true);
+    try {
+      const title = `${companionName} — ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+      const blocks = messages.slice(0, 100).map((m) => ({
+        object: 'block', type: 'paragraph',
+        paragraph: {
+          rich_text: [{ type: 'text', text: { content: `[${m.role.toUpperCase()}] ${m.content.slice(0, 2000)}` } }],
+        },
+      }));
+      const res = await fetch(notionSettings.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: 'POST', path: 'pages', token: notionSettings.token,
+          body: {
+            parent: { page_id: notionSettings.parentPageId },
+            properties: { title: { title: [{ type: 'text', text: { content: title } }] } },
+            children: blocks,
+          },
+        }),
+      });
+      if (res.ok) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Conversation saved to Notion: "${title}"` }]);
+      } else {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Failed to save to Notion: ${err instanceof Error ? err.message : 'Network error'}` }]);
+    } finally {
+      setSavingToNotion(false);
+    }
+  }, [notionSettings, messages, companionName, savingToNotion]);
 
   // Mood follows loading + error
   useEffect(() => {
@@ -389,7 +610,9 @@ export function AICompanion() {
       try {
         const ctx = {
           pathname,
-          locale: typeof navigator !== 'undefined' ? navigator.language : undefined,
+          locale: companionLocale || (typeof navigator !== 'undefined' ? navigator.language : undefined),
+          companionName,
+          jdList: jdList.length > 0 ? jdList : undefined,
           selectedJD: jdId
             ? {
                 id: jdId,
@@ -429,8 +652,24 @@ export function AICompanion() {
         setLoading(false);
       }
     },
-    [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore],
+    [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore, companionLocale, companionName, jdList],
   );
+
+  const saveExchange = useCallback(async (assistantIdx: number) => {
+    const reply = messages[assistantIdx]?.content;
+    const prompt = [...messages].slice(0, assistantIdx).reverse().find((m) => m.role === 'user')?.content;
+    if (!prompt || !reply) return;
+    try {
+      await fetch('/api/companion/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, reply, context: { pathname } }),
+      });
+      setSavedIndices((prev) => new Set([...prev, assistantIdx]));
+    } catch {
+      // silent — saving is best-effort
+    }
+  }, [messages, pathname]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const mod = e.metaKey || e.ctrlKey;
@@ -449,7 +688,7 @@ export function AICompanion() {
     }
     try {
       const rec = new SR();
-      rec.lang = (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
+      rec.lang = (voiceLang !== 'auto' ? voiceLang : null) || (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
       rec.continuous = false;
       rec.interimResults = true;
       rec.onresult = (e) => {
@@ -497,19 +736,19 @@ export function AICompanion() {
     return (
       <div
         role="button"
-        aria-label="Open Krystyna AI Companion (Cmd+J)"
+        aria-label={`Open ${companionName} AI Companion (Cmd+J)`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onDoubleClick={resetPos}
-        title="Krystyna · drag to move · double-click to reset position · Cmd/Ctrl+J to open"
+        title={`${companionName} · drag to move · double-click to reset position · Cmd/Ctrl+J to open`}
         className={cn(
           'fixed z-[60] flex h-14 w-14 cursor-grab select-none items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-shadow hover:shadow-xl',
           dragging && 'cursor-grabbing shadow-2xl',
         )}
         style={{ left: pos.x, top: pos.y, touchAction: 'none' }}
       >
-        <KrystynaAvatar mood="idle" size={44} />
+        <CompanionAvatar avatarSetting={companionAvatar} mood="idle" size={44} />
       </div>
     );
   }
@@ -527,9 +766,9 @@ export function AICompanion() {
       {/* Header */}
       <div className="shrink-0 border-b border-border-default bg-surface-header px-4 py-3">
         <div className="flex items-center gap-3">
-          <KrystynaAvatar mood={mood} size={32} />
+          <CompanionAvatar avatarSetting={companionAvatar} mood={mood} size={32} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display text-[13px] tracking-wide text-text-on-dark">Krystyna</h3>
+            <h3 className="font-display text-[13px] tracking-wide text-text-on-dark">{companionName}</h3>
             <p className="truncate text-[9px] text-text-on-dark/40">
               {pathname || 'JD Suite'}
               {jd?.jobTitle ? ` · ${jd.jobTitle}` : ''}
@@ -563,6 +802,25 @@ export function AICompanion() {
                 ⛶
               </button>
             )}
+            {notionSettings && (
+              <>
+                <button
+                  onClick={() => setNotionSearchOpen((o) => !o)}
+                  className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+                  title="Search Notion"
+                >
+                  ⊞
+                </button>
+                <button
+                  onClick={saveToNotion}
+                  disabled={savingToNotion || messages.length === 0}
+                  className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80 disabled:opacity-30"
+                  title="Save to Notion"
+                >
+                  {savingToNotion ? '…' : '↗'}
+                </button>
+              </>
+            )}
             <button
               onClick={clearChat}
               className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
@@ -581,12 +839,36 @@ export function AICompanion() {
         </div>
       </div>
 
+      {/* Notion search bar — slides in when open */}
+      {notionSearchOpen && (
+        <div className="shrink-0 border-b border-border-default bg-surface-page px-3 py-2">
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={notionSearchQuery}
+              onChange={(e) => setNotionSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') searchNotion(); if (e.key === 'Escape') setNotionSearchOpen(false); }}
+              placeholder="Search Notion pages…"
+              className="flex-1 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-[11px] text-text-primary outline-none focus:border-brand-gold"
+            />
+            <button
+              onClick={searchNotion}
+              disabled={notionSearching || !notionSearchQuery.trim()}
+              className="rounded-md bg-brand-gold px-2.5 py-1.5 text-[10px] font-medium text-white disabled:opacity-40"
+            >
+              {notionSearching ? '…' : 'Search'}
+            </button>
+          </div>
+          <p className="mt-1 text-[9px] text-text-muted">Results injected as context. Then ask {companionName} about them.</p>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 && !loading && (
           <div className="space-y-3">
             <p className="text-xs text-text-muted">
-              I'm Krystyna. Ask me about this JD, the architecture matrix, your processes, or what you should do next.
+              I&apos;m {companionName}. Ask me about this JD, the architecture matrix, your processes, or what you should do next.
             </p>
             <div className={cn('grid gap-1.5', size === 'compact' ? 'grid-cols-1' : 'grid-cols-2')}>
               {QUICK_ACTIONS.map((q) => (
@@ -602,29 +884,45 @@ export function AICompanion() {
           </div>
         )}
         {messages.map((m, i) => (
-          <div
-            key={i}
-            className={cn(
-              'max-w-[88%] whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-relaxed',
-              m.role === 'user'
-                ? 'ml-auto bg-brand-gold/10 text-text-primary'
-                : 'bg-surface-page text-text-secondary',
+          <div key={i} className={cn('group flex flex-col', m.role === 'user' ? 'items-end' : 'items-start')}>
+            <div
+              className={cn(
+                'max-w-[88%] whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-relaxed',
+                m.role === 'user'
+                  ? 'bg-brand-gold/10 text-text-primary'
+                  : 'bg-surface-page text-text-secondary',
+              )}
+            >
+              {m.content}
+            </div>
+            {m.role === 'assistant' && (
+              <button
+                onClick={() => saveExchange(i)}
+                disabled={savedIndices.has(i)}
+                className={cn(
+                  'mt-0.5 text-[9px] transition-colors',
+                  savedIndices.has(i)
+                    ? 'cursor-default text-success'
+                    : 'text-text-muted opacity-0 hover:text-brand-gold group-hover:opacity-100',
+                )}
+                title={savedIndices.has(i) ? 'Saved' : 'Save this exchange'}
+              >
+                {savedIndices.has(i) ? '✓ Saved' : '⊕ Save'}
+              </button>
             )}
-          >
-            {m.content}
           </div>
         ))}
         {loading && (
           <div className="flex items-center gap-2 text-[11px] text-text-muted">
-            <KrystynaAvatar mood="thinking" size={20} />
-            <span>Krystyna is thinking…</span>
+            <CompanionAvatar avatarSetting={companionAvatar} mood="thinking" size={20} />
+            <span>{companionName} is thinking…</span>
           </div>
         )}
         {errorState && (
           <div className="rounded-md border border-danger/30 bg-danger-bg p-2.5 text-[11px] text-danger">
             <div className="font-medium">
               {errorState.code === 'NOT_CONFIGURED' && 'AI Companion is not configured'}
-              {errorState.code === 'UNAUTHORIZED' && 'Sign in to use Krystyna'}
+              {errorState.code === 'UNAUTHORIZED' && `Sign in to use ${companionName}`}
               {errorState.code === 'AI_ERROR' && 'AI request failed'}
               {errorState.code === 'NETWORK' && 'Network problem'}
               {errorState.code === 'EMPTY' && 'Empty response'}
@@ -657,7 +955,7 @@ export function AICompanion() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={recording ? 'Listening…' : 'Ask Krystyna…  (Cmd+Enter to send)'}
+            placeholder={recording ? 'Listening…' : `Ask ${companionName}…  (Cmd+Enter to send)`}
             rows={size === 'compact' ? 1 : 2}
             className="flex-1 resize-none bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
           />
@@ -686,7 +984,7 @@ export function AICompanion() {
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[9px] text-text-muted">
           <span>Cmd/Ctrl+J · Cmd/Ctrl+Shift+J fullscreen · Esc close</span>
-          <span>Krystyna proposes — humans decide.</span>
+          <span>{companionName} proposes — humans decide.</span>
         </div>
       </div>
     </div>

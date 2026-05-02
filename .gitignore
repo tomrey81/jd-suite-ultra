@@ -5,6 +5,9 @@ dist/
 .env.local
 .env.production
 .env.*.local
+.env.vercel
+.env.vercel.*
+.env.*.tmp
 *.tsbuildinfo
 .vercel
 .turbo
@@ -16,3 +19,11 @@ test-results/
 *.jsonl
 packages/db/*_backup_*
 packages/db/jd_backup_*
+
+# Local IDE / Claude Code launch configs (contain env vars + credentials)
+.claude/launch.json
+
+# Golden fixture captured Claude responses — contain confidential JD analysis.
+# Upload to GDrive instead. See apps/web/tests/golden/claude-fixtures/README.md
+apps/web/tests/golden/claude-fixtures/*.json
+!apps/web/tests/golden/claude-fixtures/manifest.json
