@@ -91,32 +91,311 @@ export const PRO_V5_CATEGORY_MAP: ProV5CategoryMapping[] = [
   },
 ];
 
-// TODO(phase-2): Populate PRO_V5_ITEM_MAP with verified per-item links.
-//
-// What is needed:
-//   1. Read apps/web/lib/hypotheses/hypotheses.json (56 Pro v5 hypothesis IDs).
-//   2. Read ./hypotheses/r-hypotheses.ts (19 R-markers) and
-//      ./hypotheses/e-hypotheses.ts (45 E-markers) for Axiomera keys.
-//   3. For each Pro v5 ID, identify the closest Axiomera marker(s) by comparing
-//      the guidance_en field to the Pro hypothesis description.
-//   4. Record confidence (high / medium / low) and a rationale line.
-//   5. Add an admin comparison view that renders this mapping alongside both
-//      engine outputs so auditors can see provenance.
-//
-// Acceptance criteria (from docs/ultra/13-hypothesis-mapping-followup.md):
-//   - All 56 Pro v5 hypothesis IDs are present as keys in PRO_V5_ITEM_MAP.
-//   - Every entry has ≥1 axiomeraKey OR an explicit note explaining no match.
-//   - No mappings are fabricated: each must cite the guidance_en evidence.
-//   - At least one passing unit test verifies all 56 keys are present.
-//
-// The category-level map above (PRO_V5_CATEGORY_MAP) is sufficient for
-// Phase 1 coexistence. The per-item map is required only when the admin
-// consolidation view (Phase 2 milestone M2.4) is built.
+/**
+ * Per-item mapping: all 55 unique Pro v5 hypothesis keys → Axiomera R/E marker keys.
+ * Implemented in Phase 3 (M2.4). Full rationale in docs/ultra/16-hypothesis-unification.md §2.
+ *
+ * hypotheses.json has id-54 duplicated (manages_confidential_personal_data appears twice),
+ * yielding 55 unique keys despite 56 JSON entries.
+ *
+ * Derivation logic: apps/web/lib/axiomera/legacy-hypothesis-bridge.ts
+ */
 export const PRO_V5_ITEM_MAP: Record<
   string,
   { axiomeraKeys: string[]; rationale: string; confidence: 'high' | 'medium' | 'low' }
 > = {
-  // Populated in Phase 2. See TODO above and docs/ultra/13-hypothesis-mapping-followup.md.
+  // ── COG_LOW ──────────────────────────────────────────────────────────────────
+  follows_fixed_procedures: {
+    axiomeraKeys: ['structured_assignments'],
+    rationale: 'Structural overlap: following fixed procedures ≈ receiving structured assignments with defined scope.',
+    confidence: 'medium',
+  },
+  routine_under_supervision: {
+    axiomeraKeys: ['close_supervision', 'structured_environment'],
+    rationale: 'Routine under supervision implies both close_supervision (regular reporting) and structured_environment (predictable context). Both must be active.',
+    confidence: 'medium',
+  },
+  no_prior_experience: {
+    axiomeraKeys: ['no_prior_experience'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+  close_supervision: {
+    axiomeraKeys: ['close_supervision'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+  little_discretion: {
+    axiomeraKeys: ['little_discretion'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+  confirms_task_steps: {
+    axiomeraKeys: ['confirms_task_steps'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+  structured_environment: {
+    axiomeraKeys: ['structured_environment'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+  structured_assignments: {
+    axiomeraKeys: ['structured_assignments'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+  follows_verbal_written_instructions: {
+    axiomeraKeys: ['follows_verbal_written_instructions'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_1.',
+    confidence: 'high',
+  },
+
+  // ── COG_HIGH ─────────────────────────────────────────────────────────────────
+  general_direction: {
+    axiomeraKeys: ['general_direction'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+  solves_recurring_problems: {
+    axiomeraKeys: ['solves_recurring_problems'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+  solves_without_precedent: {
+    axiomeraKeys: ['solves_without_precedent'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  beyond_existing_methods: {
+    axiomeraKeys: ['beyond_existing_methods'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  determines_escalation: {
+    axiomeraKeys: ['determines_escalation'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+  unpredictable_contexts: {
+    axiomeraKeys: ['unpredictable_contexts'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  varied_non_routine: {
+    axiomeraKeys: ['varied_non_routine'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  expert_own_discipline: {
+    axiomeraKeys: ['expert_own_discipline'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  conducts_applied_research: {
+    axiomeraKeys: ['conducts_applied_research'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  writes_analytical_reports: {
+    axiomeraKeys: ['analytical_reports_x_research', 'conducts_applied_research'],
+    rationale: 'No primary marker. E interaction analytical_reports_x_research is closest; fallback to conducts_applied_research primary if interaction absent.',
+    confidence: 'medium',
+  },
+  plans_establishes_milestones: {
+    axiomeraKeys: ['milestones_x_project_management', 'performs_project_management'],
+    rationale: 'No primary marker. E interaction milestones_x_project_management is closest; fallback to performs_project_management primary.',
+    confidence: 'medium',
+  },
+  performs_project_management: {
+    axiomeraKeys: ['performs_project_management'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+
+  // ── S2_COMM ──────────────────────────────────────────────────────────────────
+  provides_direct_customer_service: {
+    axiomeraKeys: ['direct_customer_x_em_dem', 'manages_external_stakeholders'],
+    rationale: 'No primary marker. E interaction direct_customer_x_em_dem is closest; fallback to manages_external_stakeholders. Customer contact is a subset of external stakeholder management.',
+    confidence: 'low',
+  },
+  manages_external_stakeholders: {
+    axiomeraKeys: ['manages_external_stakeholders'],
+    rationale: 'Exact name match. E-hypothesis primary EMO.',
+    confidence: 'high',
+  },
+  represents_org_externally: {
+    axiomeraKeys: ['represents_org_externally'],
+    rationale: 'Exact name match. E-hypothesis primary EMO.',
+    confidence: 'high',
+  },
+  develops_professional_network: {
+    axiomeraKeys: ['develops_professional_network'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+
+  // ── PHY ──────────────────────────────────────────────────────────────────────
+  performs_physical_manual_work: {
+    axiomeraKeys: ['performs_physical_manual_work'],
+    rationale: 'Exact name match. E-hypothesis primary PHY.',
+    confidence: 'high',
+  },
+  operates_maintains_equipment: {
+    axiomeraKeys: ['operates_maintains_equipment'],
+    rationale: 'Exact name match. E-hypothesis primary PHY.',
+    confidence: 'high',
+  },
+  works_in_hazardous_conditions: {
+    axiomeraKeys: ['works_in_hazardous_conditions'],
+    rationale: 'Exact name match. E-hypothesis primary PHY.',
+    confidence: 'high',
+  },
+
+  // ── R1_PEOPLE ─────────────────────────────────────────────────────────────────
+  manages_staff_directly: {
+    axiomeraKeys: ['manages_staff_directly'],
+    rationale: 'Exact name match. E-hypothesis primary EMO (management cluster).',
+    confidence: 'high',
+  },
+  coaches_evaluates_team: {
+    axiomeraKeys: ['manages_staff_x_coaches', 'manages_staff_directly'],
+    rationale: 'No primary marker. E interaction manages_staff_x_coaches captures both staff mgmt and coaching; fallback to manages_staff_directly primary.',
+    confidence: 'medium',
+  },
+  manages_managers: {
+    axiomeraKeys: ['manages_managers'],
+    rationale: 'Exact name match. E-hypothesis primary EMO (management cluster).',
+    confidence: 'high',
+  },
+  full_mgmt_authority: {
+    axiomeraKeys: ['manages_managers_x_full_authority', 'manages_managers'],
+    rationale: 'No primary marker. E interaction manages_managers_x_full_authority captures full authority; fallback to manages_managers primary.',
+    confidence: 'medium',
+  },
+  oversees_senior_leaders: {
+    axiomeraKeys: ['oversees_senior_leaders'],
+    rationale: 'Exact name match. E-hypothesis primary EMO (management cluster).',
+    confidence: 'high',
+  },
+  drives_professional_development_others: {
+    axiomeraKeys: ['drives_professional_development_others'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+  coordinates_team_work: {
+    axiomeraKeys: ['coordinates_team_work'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+
+  // ── R3_FIN ────────────────────────────────────────────────────────────────────
+  accountable_for_budget: {
+    axiomeraKeys: ['accountable_for_budget'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  accountable_for_pnl: {
+    axiomeraKeys: ['accountable_for_budget_x_pnl', 'pnl_x_function_strategy'],
+    rationale: 'No primary marker. P&L is always co-active with budget or strategy. Covered by two E interaction keys.',
+    confidence: 'medium',
+  },
+  influences_resource_allocation: {
+    axiomeraKeys: ['influences_resource_allocation'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+
+  // ── R4_STRAT ──────────────────────────────────────────────────────────────────
+  shapes_function_strategy: {
+    axiomeraKeys: ['shapes_function_strategy'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  influences_strategic_direction: {
+    axiomeraKeys: ['strategic_direction_x_function_strategy', 'highest_authority_planning_x_strategic_direction'],
+    rationale: 'No primary marker. Strategic direction captured in two E interaction keys.',
+    confidence: 'medium',
+  },
+  highest_authority_planning: {
+    axiomeraKeys: ['highest_authority_planning_x_strategic_direction'],
+    rationale: 'No primary marker. E interaction highest_authority_planning_x_strategic_direction subsumes this concept.',
+    confidence: 'medium',
+  },
+  sets_enterprise_vision: {
+    axiomeraKeys: ['sets_enterprise_vision'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_3.',
+    confidence: 'high',
+  },
+  org_wide_impact: {
+    axiomeraKeys: ['org_wide_impact'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_3.',
+    confidence: 'high',
+  },
+  impact_beyond_team: {
+    axiomeraKeys: ['impact_beyond_team'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_2.',
+    confidence: 'high',
+  },
+  leads_multiple_functions: {
+    axiomeraKeys: ['leads_multiple_functions'],
+    rationale: 'Exact name match. E-hypothesis primary EMO (management cluster).',
+    confidence: 'high',
+  },
+  shapes_org_culture: {
+    axiomeraKeys: ['leads_functions_x_shapes_culture'],
+    rationale: 'No primary marker. E interaction leads_functions_x_shapes_culture captures culture-shaping as co-activation with leading multiple functions.',
+    confidence: 'medium',
+  },
+  member_executive_committee: {
+    axiomeraKeys: ['member_executive_committee'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_3.',
+    confidence: 'high',
+  },
+  reports_to_board: {
+    axiomeraKeys: ['reports_to_board'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_3.',
+    confidence: 'high',
+  },
+  influences_industry: {
+    axiomeraKeys: ['influences_industry'],
+    rationale: 'Exact name match. R-hypothesis LEVEL_3.',
+    confidence: 'high',
+  },
+
+  // ── RISK ──────────────────────────────────────────────────────────────────────
+  ensures_regulatory_compliance: {
+    axiomeraKeys: ['ensures_regulatory_compliance'],
+    rationale: 'Exact name match. E-hypothesis primary COG.',
+    confidence: 'high',
+  },
+  performs_risk_analysis: {
+    axiomeraKeys: ['risk_analysis_x_compliance', 'ensures_regulatory_compliance'],
+    rationale: 'No primary marker. Risk analysis is always paired with compliance in the engine. E interaction risk_analysis_x_compliance is closest; fallback to compliance primary.',
+    confidence: 'medium',
+  },
+
+  // ── EMO ───────────────────────────────────────────────────────────────────────
+  handles_emotionally_demanding_situations: {
+    axiomeraKeys: ['handles_emotionally_demanding_situations'],
+    rationale: 'Exact name match. E-hypothesis primary EMO.',
+    confidence: 'high',
+  },
+  provides_care_or_welfare_services: {
+    axiomeraKeys: ['provides_care_or_welfare_services'],
+    rationale: 'Exact name match. E-hypothesis primary EMO.',
+    confidence: 'high',
+  },
+  responsible_for_client_wellbeing: {
+    axiomeraKeys: ['responsible_for_client_wellbeing'],
+    rationale: 'Exact name match. E-hypothesis primary EMO.',
+    confidence: 'high',
+  },
+  manages_confidential_personal_data: {
+    axiomeraKeys: [],
+    rationale: 'No Axiomera analogue. Data stewardship (GDPR/confidentiality) is not modelled in the R or E hypothesis sets. Always returns false. Add dedicated E-hypothesis in a future engine version if compliance reporting requires this flag.',
+    confidence: 'low',
+  },
 };
 
 /**
