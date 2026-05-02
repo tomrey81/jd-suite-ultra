@@ -29,6 +29,23 @@ type Mood = 'idle' | 'thinking' | 'listening' | 'error';
 const STORAGE_LAUNCHER_POS = 'krystyna:launcher:pos';
 const STORAGE_PANEL_SIZE = 'krystyna:panel:size';
 const STORAGE_HISTORY = 'krystyna:history';
+const STORAGE_SETTINGS = 'jdgc_settings';
+
+/** Read companion name/avatar from shared settings localStorage key. */
+function loadCompanionSettings(): { name: string; avatar: string } {
+  if (typeof window === 'undefined') return { name: 'Krystyna', avatar: 'default' };
+  try {
+    const raw = localStorage.getItem(STORAGE_SETTINGS);
+    if (!raw) return { name: 'Krystyna', avatar: 'default' };
+    const parsed = JSON.parse(raw);
+    return {
+      name: (typeof parsed.companionName === 'string' && parsed.companionName.trim()) ? parsed.companionName.trim() : 'Krystyna',
+      avatar: typeof parsed.companionAvatar === 'string' ? parsed.companionAvatar : 'default',
+    };
+  } catch {
+    return { name: 'Krystyna', avatar: 'default' };
+  }
+}
 
 const QUICK_ACTIONS = [
   'Is this JD ready for pay equity evaluation?',
@@ -217,6 +234,78 @@ function KrystynaAvatar({ mood = 'idle', size = 36 }: { mood?: Mood; size?: numb
   );
 }
 
+/**
+ * Renders the companion avatar: custom uploaded image, a prebuilt emoji face,
+ * or the default Krystyna SVG. Falls back to Krystyna on error.
+ */
+function CompanionAvatar({
+  avatarSetting,
+  mood = 'idle',
+  size = 36,
+}: {
+  avatarSetting: string;
+  mood?: Mood;
+  size?: number;
+}) {
+  if (avatarSetting.startsWith('custom:')) {
+    const src = avatarSetting.replace('custom:', '');
+    return (
+      <img
+        src={src}
+        alt="AI companion"
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+      />
+    );
+  }
+  if (avatarSetting === 'assistant') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-label="AI companion" className="shrink-0">
+        <circle cx="50" cy="50" r="48" fill="#E8F0FE" stroke="#1A1A1A" strokeWidth="2.4" />
+        <rect x="28" y="30" width="44" height="32" rx="8" fill="#4A7DFF" stroke="#1A1A1A" strokeWidth="2" />
+        <circle cx="38" cy="46" r="5" fill="#FFFFFF" />
+        <circle cx="62" cy="46" r="5" fill="#FFFFFF" />
+        <rect x="44" y="62" width="12" height="4" rx="2" fill="#1A1A1A" />
+        <rect x="46" y="22" width="8" height="10" rx="4" fill="#4A7DFF" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="50" cy="20" r="3" fill="#F2C633" stroke="#1A1A1A" strokeWidth="1.2" />
+      </svg>
+    );
+  }
+  if (avatarSetting === 'advisor') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-label="AI companion" className="shrink-0">
+        <circle cx="50" cy="50" r="48" fill="#FEF3E8" stroke="#1A1A1A" strokeWidth="2.4" />
+        <ellipse cx="50" cy="55" rx="26" ry="28" fill="#C8935A" stroke="#1A1A1A" strokeWidth="2" />
+        <ellipse cx="34" cy="48" rx="10" ry="13" fill="#C8935A" stroke="#1A1A1A" strokeWidth="1.5" />
+        <ellipse cx="66" cy="48" rx="10" ry="13" fill="#C8935A" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="42" cy="54" r="6" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="58" cy="54" r="6" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="42" cy="54" r="3" fill="#1A1A1A" />
+        <circle cx="58" cy="54" r="3" fill="#1A1A1A" />
+        <path d="M44 66 Q50 70 56 66" stroke="#1A1A1A" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (avatarSetting === 'analyst') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" aria-label="AI companion" className="shrink-0">
+        <circle cx="50" cy="50" r="48" fill="#F0FDF4" stroke="#1A1A1A" strokeWidth="2.4" />
+        <circle cx="50" cy="52" r="26" fill="#5CB85C" stroke="#1A1A1A" strokeWidth="2" />
+        <rect x="35" y="44" width="30" height="3" rx="1.5" fill="#FAFAF7" />
+        <rect x="38" y="51" width="24" height="3" rx="1.5" fill="#FAFAF7" />
+        <rect x="41" y="58" width="18" height="3" rx="1.5" fill="#FAFAF7" />
+        <rect x="42" y="24" width="16" height="22" rx="4" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="1.5" />
+        <circle cx="50" cy="35" r="4" fill="#5CB85C" />
+      </svg>
+    );
+  }
+  // Default: Krystyna
+  return <KrystynaAvatar mood={mood} size={size} />;
+}
+
 export function AICompanion() {
   const pathname = usePathname();
   const { jdId, jd, dqsScore, ersScore } = useJDStore();
@@ -236,6 +325,10 @@ export function AICompanion() {
   const [errorState, setErrorState] = useState<{ message: string; code: string } | null>(null);
   const [mood, setMood] = useState<Mood>('idle');
 
+  // Companion identity (read from settings localStorage on mount)
+  const [companionName, setCompanionName] = useState('Krystyna');
+  const [companionAvatar, setCompanionAvatar] = useState('default');
+
   // Voice
   const [recording, setRecording] = useState(false);
   const recRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -253,6 +346,10 @@ export function AICompanion() {
   // Restore persisted state on mount + handle viewport resizes
   useEffect(() => {
     voiceSupported.current = !!getSR();
+    // Load companion name + avatar from shared settings
+    const cs = loadCompanionSettings();
+    setCompanionName(cs.name);
+    setCompanionAvatar(cs.avatar);
     try {
       const rawPos = localStorage.getItem(STORAGE_LAUNCHER_POS);
       let next = defaultPos();
@@ -497,19 +594,19 @@ export function AICompanion() {
     return (
       <div
         role="button"
-        aria-label="Open Krystyna AI Companion (Cmd+J)"
+        aria-label={`Open ${companionName} AI Companion (Cmd+J)`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onDoubleClick={resetPos}
-        title="Krystyna · drag to move · double-click to reset position · Cmd/Ctrl+J to open"
+        title={`${companionName} · drag to move · double-click to reset position · Cmd/Ctrl+J to open`}
         className={cn(
           'fixed z-[60] flex h-14 w-14 cursor-grab select-none items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-shadow hover:shadow-xl',
           dragging && 'cursor-grabbing shadow-2xl',
         )}
         style={{ left: pos.x, top: pos.y, touchAction: 'none' }}
       >
-        <KrystynaAvatar mood="idle" size={44} />
+        <CompanionAvatar avatarSetting={companionAvatar} mood="idle" size={44} />
       </div>
     );
   }
@@ -527,9 +624,9 @@ export function AICompanion() {
       {/* Header */}
       <div className="shrink-0 border-b border-border-default bg-surface-header px-4 py-3">
         <div className="flex items-center gap-3">
-          <KrystynaAvatar mood={mood} size={32} />
+          <CompanionAvatar avatarSetting={companionAvatar} mood={mood} size={32} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display text-[13px] tracking-wide text-text-on-dark">Krystyna</h3>
+            <h3 className="font-display text-[13px] tracking-wide text-text-on-dark">{companionName}</h3>
             <p className="truncate text-[9px] text-text-on-dark/40">
               {pathname || 'JD Suite'}
               {jd?.jobTitle ? ` · ${jd.jobTitle}` : ''}
@@ -586,7 +683,7 @@ export function AICompanion() {
         {messages.length === 0 && !loading && (
           <div className="space-y-3">
             <p className="text-xs text-text-muted">
-              I'm Krystyna. Ask me about this JD, the architecture matrix, your processes, or what you should do next.
+              I&apos;m {companionName}. Ask me about this JD, the architecture matrix, your processes, or what you should do next.
             </p>
             <div className={cn('grid gap-1.5', size === 'compact' ? 'grid-cols-1' : 'grid-cols-2')}>
               {QUICK_ACTIONS.map((q) => (
@@ -616,15 +713,15 @@ export function AICompanion() {
         ))}
         {loading && (
           <div className="flex items-center gap-2 text-[11px] text-text-muted">
-            <KrystynaAvatar mood="thinking" size={20} />
-            <span>Krystyna is thinking…</span>
+            <CompanionAvatar avatarSetting={companionAvatar} mood="thinking" size={20} />
+            <span>{companionName} is thinking…</span>
           </div>
         )}
         {errorState && (
           <div className="rounded-md border border-danger/30 bg-danger-bg p-2.5 text-[11px] text-danger">
             <div className="font-medium">
               {errorState.code === 'NOT_CONFIGURED' && 'AI Companion is not configured'}
-              {errorState.code === 'UNAUTHORIZED' && 'Sign in to use Krystyna'}
+              {errorState.code === 'UNAUTHORIZED' && `Sign in to use ${companionName}`}
               {errorState.code === 'AI_ERROR' && 'AI request failed'}
               {errorState.code === 'NETWORK' && 'Network problem'}
               {errorState.code === 'EMPTY' && 'Empty response'}
@@ -657,7 +754,7 @@ export function AICompanion() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={recording ? 'Listening…' : 'Ask Krystyna…  (Cmd+Enter to send)'}
+            placeholder={recording ? 'Listening…' : `Ask ${companionName}…  (Cmd+Enter to send)`}
             rows={size === 'compact' ? 1 : 2}
             className="flex-1 resize-none bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
           />
@@ -686,7 +783,7 @@ export function AICompanion() {
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[9px] text-text-muted">
           <span>Cmd/Ctrl+J · Cmd/Ctrl+Shift+J fullscreen · Esc close</span>
-          <span>Krystyna proposes — humans decide.</span>
+          <span>{companionName} proposes — humans decide.</span>
         </div>
       </div>
     </div>

@@ -18,7 +18,9 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            // microphone=(self) allows this page to request mic permission (required for
+            // Web Speech API in Krystyna and VoiceInput). Camera and geolocation remain blocked.
+            value: 'camera=(), microphone=(self), geolocation=()',
           },
         ],
       },

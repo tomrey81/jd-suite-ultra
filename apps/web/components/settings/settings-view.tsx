@@ -14,6 +14,13 @@ interface GovSettings {
   bilingualSourceLang: string;
   bilingualTargetLang: string;
   bilingualLayout: 'side-by-side' | 'section-by-section' | 'source-first' | 'target-first';
+  /** Custom display name for the AI companion. Defaults to 'Krystyna'. */
+  companionName: string;
+  /**
+   * Avatar selector. 'default' = Krystyna SVG, 'assistant' | 'advisor' | 'analyst' = prebuilt
+   * SVG faces, or 'custom:<dataURL>' for a user-uploaded image stored as base64.
+   */
+  companionAvatar: string;
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -52,6 +59,8 @@ const DEFAULTS: GovSettings = {
   bilingualSourceLang: 'EN',
   bilingualTargetLang: 'PL',
   bilingualLayout: 'side-by-side',
+  companionName: 'Krystyna',
+  companionAvatar: 'default',
 };
 
 const LS_KEY = 'jdgc_settings';
@@ -80,7 +89,7 @@ function Field({ label, desc, children }: { label: string; desc?: string; childr
   );
 }
 
-type Tab = 'general' | 'integrations' | 'export' | 'ai';
+type Tab = 'general' | 'companion' | 'integrations' | 'export' | 'ai';
 
 export function SettingsView() {
   const [settings, setSettings] = useState<GovSettings>(DEFAULTS);
@@ -88,6 +97,7 @@ export function SettingsView() {
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [notionStatus, setNotionStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [notionMsg, setNotionMsg] = useState('');
+  const [avatarUploadError, setAvatarUploadError] = useState('');
 
   useEffect(() => {
     setSettings(loadSettings());
@@ -144,10 +154,34 @@ export function SettingsView() {
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'general', label: 'General', icon: '⚙' },
+    { id: 'companion', label: 'AI Companion', icon: '◉' },
     { id: 'integrations', label: 'Integrations', icon: '⊞' },
     { id: 'export', label: 'Export & Translation', icon: '⇄' },
     { id: 'ai', label: 'AI Models', icon: '✦' },
   ];
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAvatarUploadError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setAvatarUploadError('Only PNG, JPEG, or WebP images are accepted.');
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      setAvatarUploadError('Image must be under 512 KB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      update('companionAvatar', `custom:${dataUrl}`);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so the same file can be re-selected after clearing
+    e.target.value = '';
+  };
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -221,6 +255,100 @@ export function SettingsView() {
                       <option key={l.code} value={l.code}>{l.label}</option>
                     ))}
                   </select>
+                </Field>
+              </section>
+            </>
+          )}
+
+          {/* Companion Tab */}
+          {activeTab === 'companion' && (
+            <>
+              <section>
+                <h2 className="mb-4 text-sm font-semibold text-text-primary">Companion Identity</h2>
+                <Field
+                  label="Companion name"
+                  desc="The name shown in the chat panel and throughout the interface. Default: Krystyna."
+                >
+                  <input
+                    className={inputCls}
+                    value={settings.companionName}
+                    onChange={(e) => update('companionName', e.target.value || 'Krystyna')}
+                    placeholder="Krystyna"
+                    maxLength={32}
+                  />
+                  <p className="mt-1 text-[10px] text-text-muted">
+                    Max 32 characters. Leave blank to keep "Krystyna".
+                  </p>
+                </Field>
+              </section>
+
+              <section>
+                <h2 className="mb-4 text-sm font-semibold text-text-primary">Avatar</h2>
+                <Field label="Choose a preset avatar" desc="Select one of the prebuilt avatars or upload your own image.">
+                  <div className="grid grid-cols-4 gap-3">
+                    {([
+                      { key: 'default',   label: 'Krystyna',  emoji: '👷' },
+                      { key: 'assistant', label: 'Assistant', emoji: '🤖' },
+                      { key: 'advisor',   label: 'Advisor',   emoji: '🦉' },
+                      { key: 'analyst',   label: 'Analyst',   emoji: '🔬' },
+                    ] as const).map((opt) => {
+                      const isSelected = settings.companionAvatar === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => { update('companionAvatar', opt.key); setAvatarUploadError(''); }}
+                          className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 transition-all ${
+                            isSelected
+                              ? 'border-brand-gold bg-brand-gold/10'
+                              : 'border-border-default bg-white hover:border-brand-gold/40'
+                          }`}
+                        >
+                          <span className="text-3xl">{opt.emoji}</span>
+                          <span className="text-[11px] font-medium text-text-secondary">{opt.label}</span>
+                          {isSelected && (
+                            <span className="rounded-full bg-brand-gold px-2 py-0.5 text-[9px] font-semibold text-white">Active</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+
+                <Field
+                  label="Custom avatar"
+                  desc="Upload your own image (PNG, JPEG or WebP, max 512 KB). Displayed in a circle crop."
+                >
+                  <div className="flex items-center gap-3">
+                    {settings.companionAvatar.startsWith('custom:') && (
+                      <img
+                        src={settings.companionAvatar.replace('custom:', '')}
+                        alt="Custom avatar preview"
+                        className="h-12 w-12 rounded-full border border-border-default object-cover"
+                      />
+                    )}
+                    <label className="cursor-pointer rounded-lg border border-border-default bg-surface-page px-4 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-brand-gold hover:text-brand-gold">
+                      {settings.companionAvatar.startsWith('custom:') ? 'Replace image' : 'Upload image'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                      />
+                    </label>
+                    {settings.companionAvatar.startsWith('custom:') && (
+                      <button
+                        type="button"
+                        onClick={() => { update('companionAvatar', 'default'); setAvatarUploadError(''); }}
+                        className="text-[11px] text-text-muted hover:text-danger"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {avatarUploadError && (
+                    <p className="mt-2 text-[11px] text-danger">{avatarUploadError}</p>
+                  )}
                 </Field>
               </section>
             </>
