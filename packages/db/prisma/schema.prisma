@@ -55,9 +55,6 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  // Phase 3 — user preferences
-  preferredLanguage String? // ISO-639-1 code, e.g. "pl" — synced from settings on save
-
   memberships      Membership[]
   ownedJDs         JobDescription[] @relation("JDOwner")
   jdVersions       JDVersion[]
