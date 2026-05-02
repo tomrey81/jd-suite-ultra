@@ -31,19 +31,49 @@ const STORAGE_PANEL_SIZE = 'krystyna:panel:size';
 const STORAGE_HISTORY = 'krystyna:history';
 const STORAGE_SETTINGS = 'jdgc_settings';
 
-/** Read companion name/avatar from shared settings localStorage key. */
-function loadCompanionSettings(): { name: string; avatar: string } {
-  if (typeof window === 'undefined') return { name: 'Krystyna', avatar: 'default' };
+interface CompanionSettings {
+  name: string;
+  avatar: string;
+  locale: string;
+  voiceLang: string;
+  notionToken: string;
+  notionWorkerUrl: string;
+  notionParentPageId: string;
+}
+
+/** Read companion settings from shared jdgc_settings localStorage key. */
+function loadCompanionSettings(): CompanionSettings {
+  const defaults: CompanionSettings = { name: 'Krystyna', avatar: 'default', locale: 'en', voiceLang: 'auto', notionToken: '', notionWorkerUrl: '', notionParentPageId: '' };
+  if (typeof window === 'undefined') return defaults;
   try {
     const raw = localStorage.getItem(STORAGE_SETTINGS);
-    if (!raw) return { name: 'Krystyna', avatar: 'default' };
-    const parsed = JSON.parse(raw);
+    if (!raw) return defaults;
+    const p = JSON.parse(raw);
     return {
-      name: (typeof parsed.companionName === 'string' && parsed.companionName.trim()) ? parsed.companionName.trim() : 'Krystyna',
-      avatar: typeof parsed.companionAvatar === 'string' ? parsed.companionAvatar : 'default',
+      name: (typeof p.companionName === 'string' && p.companionName.trim()) ? p.companionName.trim() : 'Krystyna',
+      avatar: typeof p.companionAvatar === 'string' ? p.companionAvatar : 'default',
+      locale: typeof p.interfaceLanguage === 'string' ? p.interfaceLanguage : 'en',
+      voiceLang: typeof p.voiceLang === 'string' ? p.voiceLang : 'auto',
+      notionToken: typeof p.notionToken === 'string' ? p.notionToken : '',
+      notionWorkerUrl: typeof p.workerUrl === 'string' ? p.workerUrl : '',
+      notionParentPageId: typeof p.notionParentPageId === 'string' ? p.notionParentPageId : '',
     };
   } catch {
-    return { name: 'Krystyna', avatar: 'default' };
+    return defaults;
+  }
+}
+
+type JDSummary = { id: string; jobTitle?: string | null; status?: string };
+
+async function fetchJDList(): Promise<JDSummary[]> {
+  try {
+    const res = await fetch('/api/jd');
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return (data as JDSummary[]).slice(0, 30).map((j) => ({ id: j.id, jobTitle: j.jobTitle, status: j.status }));
+  } catch {
+    return [];
   }
 }
 
@@ -328,6 +358,18 @@ export function AICompanion() {
   // Companion identity (read from settings localStorage on mount)
   const [companionName, setCompanionName] = useState('Krystyna');
   const [companionAvatar, setCompanionAvatar] = useState('default');
+  const [companionLocale, setCompanionLocale] = useState('en');
+  const [voiceLang, setVoiceLang] = useState('auto');
+
+  // JD workspace list (fetched lazily on first open)
+  const [jdList, setJdList] = useState<JDSummary[]>([]);
+
+  // Notion integration
+  const [notionSettings, setNotionSettings] = useState<{ token: string; workerUrl: string; parentPageId: string } | null>(null);
+  const [notionSearchQuery, setNotionSearchQuery] = useState('');
+  const [notionSearchOpen, setNotionSearchOpen] = useState(false);
+  const [notionSearching, setNotionSearching] = useState(false);
+  const [savingToNotion, setSavingToNotion] = useState(false);
 
   // Saved exchanges (set of assistant message indices that have been saved)
   const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
@@ -349,10 +391,15 @@ export function AICompanion() {
   // Restore persisted state on mount + handle viewport resizes
   useEffect(() => {
     voiceSupported.current = !!getSR();
-    // Load companion name + avatar from shared settings
+    // Load companion settings from localStorage
     const cs = loadCompanionSettings();
     setCompanionName(cs.name);
     setCompanionAvatar(cs.avatar);
+    setCompanionLocale(cs.locale);
+    setVoiceLang(cs.voiceLang);
+    if (cs.notionToken && cs.notionWorkerUrl) {
+      setNotionSettings({ token: cs.notionToken, workerUrl: cs.notionWorkerUrl, parentPageId: cs.notionParentPageId });
+    }
     try {
       const rawPos = localStorage.getItem(STORAGE_LAUNCHER_POS);
       let next = defaultPos();
@@ -418,6 +465,80 @@ export function AICompanion() {
   useEffect(() => {
     if (open && inputRef.current) inputRef.current.focus();
   }, [open]);
+
+  // Fetch JD list on first open (used to give Krystyna workspace awareness)
+  useEffect(() => {
+    if (!open || jdList.length > 0) return;
+    fetchJDList().then(setJdList);
+  }, [open, jdList.length]);
+
+  // Notion: search workspace pages
+  const searchNotion = useCallback(async () => {
+    if (!notionSettings || !notionSearchQuery.trim()) return;
+    setNotionSearching(true);
+    try {
+      const res = await fetch(notionSettings.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: 'POST', path: 'search', token: notionSettings.token,
+          body: { query: notionSearchQuery.trim(), filter: { property: 'object', value: 'page' }, page_size: 5 },
+        }),
+      });
+      const data = await res.json();
+      const results: Array<Record<string, unknown>> = data.results || [];
+      const summary = results.length === 0
+        ? `No Notion pages found for "${notionSearchQuery}".`
+        : `Notion search: "${notionSearchQuery}" — ${results.length} page(s) found:\n${results.map((p) => {
+            const props = p.properties as Record<string, { title?: Array<{ plain_text?: string }> }> | undefined;
+            const title = props?.title?.title?.[0]?.plain_text || props?.Name?.title?.[0]?.plain_text || 'Untitled';
+            return `- ${title}`;
+          }).join('\n')}`;
+      setMessages((prev) => [...prev, { role: 'assistant', content: summary }]);
+      setNotionSearchQuery('');
+      setNotionSearchOpen(false);
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Notion search failed: ${err instanceof Error ? err.message : 'Network error'}` }]);
+    } finally {
+      setNotionSearching(false);
+    }
+  }, [notionSettings, notionSearchQuery]);
+
+  // Notion: save conversation as a page
+  const saveToNotion = useCallback(async () => {
+    if (!notionSettings || messages.length === 0 || savingToNotion) return;
+    setSavingToNotion(true);
+    try {
+      const title = `${companionName} — ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+      const blocks = messages.slice(0, 100).map((m) => ({
+        object: 'block', type: 'paragraph',
+        paragraph: {
+          rich_text: [{ type: 'text', text: { content: `[${m.role.toUpperCase()}] ${m.content.slice(0, 2000)}` } }],
+        },
+      }));
+      const res = await fetch(notionSettings.workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: 'POST', path: 'pages', token: notionSettings.token,
+          body: {
+            parent: { page_id: notionSettings.parentPageId },
+            properties: { title: { title: [{ type: 'text', text: { content: title } }] } },
+            children: blocks,
+          },
+        }),
+      });
+      if (res.ok) {
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Conversation saved to Notion: "${title}"` }]);
+      } else {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    } catch (err) {
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Failed to save to Notion: ${err instanceof Error ? err.message : 'Network error'}` }]);
+    } finally {
+      setSavingToNotion(false);
+    }
+  }, [notionSettings, messages, companionName, savingToNotion]);
 
   // Mood follows loading + error
   useEffect(() => {
@@ -489,8 +610,9 @@ export function AICompanion() {
       try {
         const ctx = {
           pathname,
-          locale: typeof navigator !== 'undefined' ? navigator.language : undefined,
+          locale: companionLocale || (typeof navigator !== 'undefined' ? navigator.language : undefined),
           companionName,
+          jdList: jdList.length > 0 ? jdList : undefined,
           selectedJD: jdId
             ? {
                 id: jdId,
@@ -530,7 +652,7 @@ export function AICompanion() {
         setLoading(false);
       }
     },
-    [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore],
+    [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore, companionLocale, companionName, jdList],
   );
 
   const saveExchange = useCallback(async (assistantIdx: number) => {
@@ -566,7 +688,7 @@ export function AICompanion() {
     }
     try {
       const rec = new SR();
-      rec.lang = (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
+      rec.lang = (voiceLang !== 'auto' ? voiceLang : null) || (typeof navigator !== 'undefined' && navigator.language) || 'en-US';
       rec.continuous = false;
       rec.interimResults = true;
       rec.onresult = (e) => {
@@ -680,6 +802,25 @@ export function AICompanion() {
                 ⛶
               </button>
             )}
+            {notionSettings && (
+              <>
+                <button
+                  onClick={() => setNotionSearchOpen((o) => !o)}
+                  className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+                  title="Search Notion"
+                >
+                  ⊞
+                </button>
+                <button
+                  onClick={saveToNotion}
+                  disabled={savingToNotion || messages.length === 0}
+                  className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80 disabled:opacity-30"
+                  title="Save to Notion"
+                >
+                  {savingToNotion ? '…' : '↗'}
+                </button>
+              </>
+            )}
             <button
               onClick={clearChat}
               className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
@@ -697,6 +838,30 @@ export function AICompanion() {
           </div>
         </div>
       </div>
+
+      {/* Notion search bar — slides in when open */}
+      {notionSearchOpen && (
+        <div className="shrink-0 border-b border-border-default bg-surface-page px-3 py-2">
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={notionSearchQuery}
+              onChange={(e) => setNotionSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') searchNotion(); if (e.key === 'Escape') setNotionSearchOpen(false); }}
+              placeholder="Search Notion pages…"
+              className="flex-1 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-[11px] text-text-primary outline-none focus:border-brand-gold"
+            />
+            <button
+              onClick={searchNotion}
+              disabled={notionSearching || !notionSearchQuery.trim()}
+              className="rounded-md bg-brand-gold px-2.5 py-1.5 text-[10px] font-medium text-white disabled:opacity-40"
+            >
+              {notionSearching ? '…' : 'Search'}
+            </button>
+          </div>
+          <p className="mt-1 text-[9px] text-text-muted">Results injected as context. Then ask {companionName} about them.</p>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">

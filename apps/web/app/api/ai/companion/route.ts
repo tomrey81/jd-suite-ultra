@@ -38,6 +38,16 @@ const requestSchema = z.object({
           ersScore: z.number().optional(),
         })
         .optional(),
+      jdList: z
+        .array(
+          z.object({
+            id: z.string(),
+            title: z.string().optional(),
+            status: z.string().optional(),
+          }),
+        )
+        .max(50)
+        .optional(),
       userRole: z.string().optional(),
     })
     .optional(),
@@ -83,6 +93,16 @@ const KRYSTYNA_SYSTEM = (ctx: z.infer<typeof requestSchema>['context']) => {
     '',
     'When you are not sure what the user wants, ask one short clarifying question instead of guessing.',
   ];
+
+  if (ctx?.jdList && ctx.jdList.length > 0) {
+    lines.push('', 'WORKSPACE JDS (reference list — use /jd/{id} links when relevant)');
+    for (const jd of ctx.jdList) {
+      const parts: string[] = [`id=${jd.id}`];
+      if (jd.title) parts.push(`title=${jd.title}`);
+      if (jd.status) parts.push(`status=${jd.status}`);
+      lines.push(`— ${parts.join(', ')}`);
+    }
+  }
 
   if (ctx?.pathname) {
     lines.push('', 'CURRENT CONTEXT');

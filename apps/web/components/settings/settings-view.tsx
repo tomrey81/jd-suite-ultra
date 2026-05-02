@@ -21,7 +21,26 @@ interface GovSettings {
    * SVG faces, or 'custom:<dataURL>' for a user-uploaded image stored as base64.
    */
   companionAvatar: string;
+  /**
+   * BCP-47 language tag for voice recognition (Web Speech API rec.lang).
+   * 'auto' = use browser default (navigator.language).
+   */
+  voiceLang: string;
 }
+
+const VOICE_LANGUAGES = [
+  { code: 'auto',    label: 'Auto (browser default)' },
+  { code: 'en-GB',   label: 'English (UK)' },
+  { code: 'en-US',   label: 'English (US)' },
+  { code: 'pl-PL',   label: 'Polish' },
+  { code: 'de-DE',   label: 'German' },
+  { code: 'fr-FR',   label: 'French' },
+  { code: 'es-ES',   label: 'Spanish' },
+  { code: 'sk-SK',   label: 'Slovak' },
+  { code: 'cs-CZ',   label: 'Czech' },
+  { code: 'ro-RO',   label: 'Romanian' },
+  { code: 'sv-SE',   label: 'Swedish' },
+];
 
 const SUPPORTED_LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -61,6 +80,7 @@ const DEFAULTS: GovSettings = {
   bilingualLayout: 'side-by-side',
   companionName: 'Krystyna',
   companionAvatar: 'default',
+  voiceLang: 'auto',
 };
 
 const LS_KEY = 'jdgc_settings';
@@ -279,6 +299,24 @@ export function SettingsView() {
                   <p className="mt-1 text-[10px] text-text-muted">
                     Max 32 characters. Leave blank to keep "Krystyna".
                   </p>
+                </Field>
+              </section>
+
+              <section>
+                <h2 className="mb-4 text-sm font-semibold text-text-primary">Voice Input</h2>
+                <Field
+                  label="Voice recognition language"
+                  desc="Language used by the browser's speech recognition engine. 'Auto' uses the browser's default language."
+                >
+                  <select
+                    className={inputCls}
+                    value={settings.voiceLang}
+                    onChange={(e) => update('voiceLang', e.target.value)}
+                  >
+                    {VOICE_LANGUAGES.map((l) => (
+                      <option key={l.code} value={l.code}>{l.label}</option>
+                    ))}
+                  </select>
                 </Field>
               </section>
 
