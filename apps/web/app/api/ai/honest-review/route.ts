@@ -54,7 +54,7 @@ Return JSON only:
   "overallNarrative": "3-4 sentence honest narrative, plain text"
 }`,
       3000,
-    );
+      { operation: 'jd.honestReview', context: { orgId: session?.orgId, userId: session?.user?.id } });
 
     const result = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim());
     return NextResponse.json(result);

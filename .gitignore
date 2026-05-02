@@ -5,6 +5,9 @@ dist/
 .env.local
 .env.production
 .env.*.local
+.env.vercel
+.env.vercel.*
+.env.*.tmp
 *.tsbuildinfo
 .vercel
 .turbo
@@ -16,3 +19,6 @@ test-results/
 *.jsonl
 packages/db/*_backup_*
 packages/db/jd_backup_*
+
+# Local IDE / Claude Code launch configs (contain env vars + credentials)
+.claude/launch.json

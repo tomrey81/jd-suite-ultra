@@ -67,7 +67,8 @@ Return JSON in this exact shape:
 
   let parsed: { results: HypothesisResult[] };
   try {
-    const response = await callClaude(SYSTEM_PROMPT, userMessage, 8000);
+    const response = await callClaude(SYSTEM_PROMPT, userMessage, 8000,
+      { operation: 'jd.testHypotheses', context: { orgId: session?.orgId, userId: session?.user?.id } });
     // Strip markdown code fences if present
     const cleaned = response
       .replace(/^```(?:json)?\s*/i, '')

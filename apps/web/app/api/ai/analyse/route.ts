@@ -43,6 +43,10 @@ Return JSON only (no markdown):
   "fieldScores": { "fieldId": {"score":0-100,"badge":"good|needs-work|missing","note":"one plain text sentence"} }
 }`,
       5000,
+      {
+        operation: 'jd.analyse',
+        context: { orgId: session.orgId, userId: session.user.id },
+      },
     );
 
     const result = JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim());

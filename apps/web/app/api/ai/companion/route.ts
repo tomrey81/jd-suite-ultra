@@ -28,6 +28,7 @@ const requestSchema = z.object({
       pathname: z.string().optional(),
       module: z.string().optional(),
       locale: z.string().optional(),
+      companionName: z.string().max(32).optional(),
       selectedJD: z
         .object({
           id: z.string().optional(),
@@ -37,14 +38,27 @@ const requestSchema = z.object({
           ersScore: z.number().optional(),
         })
         .optional(),
+      jdList: z
+        .array(
+          z.object({
+            id: z.string(),
+            title: z.string().optional(),
+            status: z.string().optional(),
+          }),
+        )
+        .max(50)
+        .optional(),
       userRole: z.string().optional(),
     })
     .optional(),
 });
 
 const KRYSTYNA_SYSTEM = (ctx: z.infer<typeof requestSchema>['context']) => {
+  const name = ctx?.companionName?.trim() || 'Krystyna';
+  const locale = ctx?.locale || 'en';
+
   const lines: string[] = [
-    'You are Krystyna — the JD Suite AI Companion.',
+    `You are ${name} — the JD Suite AI Companion.`,
     '',
     'You help HR, Total Rewards, and Pay Transparency professionals manage Job Descriptions, Job Architecture, Org Structure, Process Maps, and Compliance work in JD Suite.',
     '',
@@ -53,6 +67,11 @@ const KRYSTYNA_SYSTEM = (ctx: z.infer<typeof requestSchema>['context']) => {
     '— Plain language, no marketing fluff, no jargon for the sake of it.',
     '— Plain text only: no markdown headers, no asterisks, no emoji icons. A single dash is fine for lists.',
     '— Keep replies short by default. Only go long when the user explicitly asks for detail.',
+    '',
+    'LANGUAGE',
+    `— The user's interface language is: ${locale}.`,
+    '— Respond in the same language the user writes in.',
+    '— If the interface language is not English, default to that language for your replies unless the user explicitly writes in English.',
     '',
     'OPERATING PRINCIPLES',
     '1. Human decides always. You propose, analyse, detect, question, and summarise.',
@@ -70,9 +89,20 @@ const KRYSTYNA_SYSTEM = (ctx: z.infer<typeof requestSchema>['context']) => {
     '— Generating a Command Center task list, a workflow status table, or a reminder draft.',
     '— Explaining why a role sits at a given band based on its evaluation score.',
     '— Pointing the user to the next sensible step.',
+    '— Sharing a direct link to a JD when relevant (format: /jd/{id}).',
     '',
     'When you are not sure what the user wants, ask one short clarifying question instead of guessing.',
   ];
+
+  if (ctx?.jdList && ctx.jdList.length > 0) {
+    lines.push('', 'WORKSPACE JDS (reference list — use /jd/{id} links when relevant)');
+    for (const jd of ctx.jdList) {
+      const parts: string[] = [`id=${jd.id}`];
+      if (jd.title) parts.push(`title=${jd.title}`);
+      if (jd.status) parts.push(`status=${jd.status}`);
+      lines.push(`— ${parts.join(', ')}`);
+    }
+  }
 
   if (ctx?.pathname) {
     lines.push('', 'CURRENT CONTEXT');
@@ -158,7 +188,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const text = await callClaude(KRYSTYNA_SYSTEM(context), userMessage, 1500);
+    const text = await callClaude(KRYSTYNA_SYSTEM(context), userMessage, 1500,
+      { operation: 'companion.message', context: { orgId: session?.orgId, userId: session?.user?.id } });
     return NextResponse.json({ reply: text.trim() });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'AI request failed';
