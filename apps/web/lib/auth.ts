@@ -1,9 +1,6 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
-import GitHub from 'next-auth/providers/github';
-import LinkedIn from 'next-auth/providers/linkedin';
-import Facebook from 'next-auth/providers/facebook';
 import { compare } from 'bcryptjs';
 import { db } from '@jd-suite/db';
 import { headers } from 'next/headers';
@@ -121,9 +118,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
     Google({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET }),
-    GitHub({ clientId: process.env.GITHUB_CLIENT_ID, clientSecret: process.env.GITHUB_CLIENT_SECRET }),
-    LinkedIn({ clientId: process.env.LINKEDIN_CLIENT_ID, clientSecret: process.env.LINKEDIN_CLIENT_SECRET }),
-    Facebook({ clientId: process.env.FACEBOOK_CLIENT_ID, clientSecret: process.env.FACEBOOK_CLIENT_SECRET }),
   ],
   pages: {
     signIn: '/login',
