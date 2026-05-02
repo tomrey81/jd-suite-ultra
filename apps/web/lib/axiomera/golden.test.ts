@@ -203,7 +203,23 @@ describe('G-7 Golden test harness', () => {
       );
     }
 
-    // MGMT: skipped — engine does not output mgmt flag (gap documented in 14-golden-fixtures-setup.md)
+    // MGMT: derive from active E-keys (same logic as runAxiomera)
+    const MGMT_KEYS = new Set([
+      'manages_staff_directly',
+      'manages_managers',
+      'oversees_senior_leaders',
+      'leads_multiple_functions',
+      'manages_managers_x_full_authority',
+    ]);
+    const engineMgmt = eResult.active_keys.some((k) => MGMT_KEYS.has(k));
+
+    if (fixture.mgmt !== engineMgmt) {
+      console.warn(
+        `[golden] ${fixture.id} MGMT divergence: engine=${engineMgmt}, oracle=${fixture.mgmt} (eActiveKeys=[${eResult.active_keys.filter((k) => MGMT_KEYS.has(k)).join(', ')}])`,
+      );
+    }
+    // Soft assertion — log divergence but don't fail (management markers under-fire in real Claude responses)
+    // Harden to hard failure once prompt calibration improves mgmt detection (Goal 3 follow-up)
   };
 
   // Register individual fixture tests so vitest shows per-fixture results

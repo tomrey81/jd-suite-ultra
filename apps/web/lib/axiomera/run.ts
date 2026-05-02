@@ -70,6 +70,9 @@ export interface AxiomeraRunOutput {
   rActiveKeys: string[];
   eActiveKeys: string[];
   rContradictions: string[];
+  /** True if any management E-markers are active (manages_staff_directly, manages_managers,
+   *  oversees_senior_leaders, leads_multiple_functions, or manages_managers_x_full_authority) */
+  mgmt: boolean;
 }
 
 function sLevelFromPoints(pts: number): 'S1' | 'S2' | 'S3' | 'S4' | 'S5' {
@@ -130,6 +133,16 @@ export async function runAxiomera(input: AxiomeraRunInput): Promise<AxiomeraRunO
   const ciGlobal = computeCiGlobal(ciR, ciE);
   const contradictionFlag = isContradiction(ciR, ciE) || rResult.contradictions.length > 0;
   const needsReviewFlag = needsReview(ciGlobal, contradictionFlag);
+
+  // MGMT detection — true if any management E-markers are active
+  const MGMT_KEYS = new Set([
+    'manages_staff_directly',
+    'manages_managers',
+    'oversees_senior_leaders',
+    'leads_multiple_functions',
+    'manages_managers_x_full_authority',
+  ]);
+  const mgmt = eResult.active_keys.some((k) => MGMT_KEYS.has(k));
 
   // 7. Persist
   // Cast to any until prisma client regenerates with new models
@@ -296,5 +309,6 @@ export async function runAxiomera(input: AxiomeraRunInput): Promise<AxiomeraRunO
     rActiveKeys: rResult.active_keys,
     eActiveKeys: eResult.active_keys,
     rContradictions: rResult.contradictions,
+    mgmt,
   };
 }
