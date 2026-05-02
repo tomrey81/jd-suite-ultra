@@ -29,7 +29,6 @@
  * RESUMABILITY: if a capture file already exists, it is skipped unless --force.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { R_HYPOTHESES } from '../lib/axiomera/hypotheses/r-hypotheses';
@@ -224,8 +223,14 @@ function extractActivations(
 // Core capture function
 // ---------------------------------------------------------------------------
 
+interface AnthropicApiResponse {
+  content?: Array<{ type: string; text?: string }>;
+  usage?: { input_tokens?: number; output_tokens?: number };
+  error?: { message: string };
+}
+
 async function captureOne(
-  client: Anthropic,
+  apiKey: string,
   fixture: GoldenFixture,
   extraction: 'R' | 'E',
 ): Promise<CapturedExtraction | { error: string }> {
@@ -253,20 +258,34 @@ async function captureOne(
 
   const t0 = Date.now();
   try {
-    const response = await client.messages.create({
-      model: MODEL_ID,
-      max_tokens: MAX_TOKENS,
-      temperature: 0,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: MODEL_ID,
+        max_tokens: MAX_TOKENS,
+        temperature: 0,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
     });
 
     const durationMs = Date.now() - t0;
+    const json = (await res.json()) as AnthropicApiResponse;
+
+    if (!res.ok) {
+      return { error: `HTTP ${res.status}: ${json.error?.message ?? JSON.stringify(json)}` };
+    }
+
     const rawText =
-      response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-        .map((b) => b.text)
-        .join('') ?? '';
+      (json.content ?? [])
+        .filter((b) => b.type === 'text')
+        .map((b) => b.text ?? '')
+        .join('');
 
     const activations = extractActivations(rawText);
     if (!activations) {
@@ -286,8 +305,8 @@ async function captureOne(
       jobTitle: fixture.job_title,
       extraction,
       modelId: MODEL_ID,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
+      inputTokens: json.usage?.input_tokens ?? 0,
+      outputTokens: json.usage?.output_tokens ?? 0,
       durationMs,
       activations,
       rawText,
@@ -364,7 +383,7 @@ async function main() {
     }
   }
 
-  const client = new Anthropic({ apiKey: apiKey ?? 'dry-run-key' });
+  const resolvedKey = apiKey ?? 'dry-run-key';
 
   let successCount = 0;
   let skipCount = 0;
@@ -384,7 +403,7 @@ async function main() {
       }
 
       console.log(`  [run]  ${fixture.id} ${extraction} — ${fixture.job_title}`);
-      const result = await captureOne(client, fixture, extraction);
+      const result = await captureOne(resolvedKey, fixture, extraction);
 
       if ('error' in result) {
         console.error(`  [err]  ${fixture.id} ${extraction}: ${result.error}`);
