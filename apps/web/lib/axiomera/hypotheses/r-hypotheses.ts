@@ -67,7 +67,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Ustrukturyzowane zadania',
     label_en: 'Structured assignments',
     label_de: 'Strukturierte Aufgaben',
-    guidance_en: 'Task scope is fully defined before work begins — what to do, how to do it, and success criteria are all prescribed. Active ONLY when the role has NO latitude to plan or structure its own work. Exclude roles that plan projects, manage workstreams, or determine how to meet objectives, even if they operate within a broader framework.',
+    guidance_en: 'The role primarily executes against pre-defined task types with clear scope boundaries — the WHAT (what to work on, what to produce) is handed to the role holder, not self-determined. Examples: operating equipment per shift schedule, processing applications against a defined checklist, delivering treatments according to service protocols, loading/unloading items per manifest. NOT active when the role defines its own work programme, manages projects, sets objectives, or holds a professional practice with client-directed scope.',
   },
   {
     key: 'follows_verbal_written_instructions',
@@ -83,7 +83,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Ustrukturyzowane środowisko pracy',
     label_en: 'Structured work environment',
     label_de: 'Strukturiertes Arbeitsumfeld',
-    guidance_en: 'Work is governed by SOPs, regulations, or procedural frameworks so tightly that any deviation requires explicit supervisory authorisation. Active only for roles where strict adherence to rules IS the primary mode of work. Not active merely because a role operates within a regulated sector or uses documented processes — most professional roles do.',
+    guidance_en: 'Work is primarily governed by operational procedures, technical protocols, safety rules, or service delivery standards — the role executes within these structures rather than interpreting or adapting them. Active for manual, technical, and service delivery roles where defined procedures shape day-to-day work (e.g. operating procedures, health/safety protocols, standard treatment protocols, quality control rules). NOT active for professional or analytical roles where procedures are a background constraint rather than the primary mode of work — e.g. legal, policy, management, or advisory roles operate within rules but are not structurally governed by them.',
   },
   {
     key: 'solves_recurring_problems',
@@ -91,7 +91,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Rozwiązuje powtarzalne problemy',
     label_en: 'Solves recurring problems',
     label_de: 'Löst wiederkehrende Probleme',
-    guidance_en: 'Applies established procedures to diagnose and resolve problem types the role has encountered before — following known templates rather than developing new approaches. Active when JD explicitly says problems are "standard", "routine", or references checklists/established procedures. NOT active merely because the role performs repetitive tasks or works within a defined scope.',
+    guidance_en: 'Addresses defined problem domains using established methods, procedures, or clinical/technical protocols. The problems are the known types that come with the role — equipment faults, client treatment needs, application queries, processing errors — and solutions follow established paths. Active when the role troubleshoots, handles, or resolves issues that are characteristic of the role type and handled via standard practice. NOT active when the role requires novel analysis, policy formulation, legal reasoning, or developing new approaches to unfamiliar or strategic challenges.',
   },
 
   // === LEVEL 2 — MODERATE (autonomy, coordination, beyond-team impact) ===
@@ -109,7 +109,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Działa pod ogólnym kierunkiem',
     label_en: 'Works under general direction',
     label_de: 'Arbeitet unter allgemeiner Anleitung',
-    guidance_en: 'Role holder receives goals or outcomes and independently determines their own methods, priorities, and pace — without managerial oversight of HOW work is done. Active only when autonomy over method is explicit (e.g. "works independently", "self-directed", "no day-to-day supervision", "sets own work programme"). NOT active for roles that "support", "assist", or "report to" a named director/manager — those signal directed work, not general direction.',
+    guidance_en: 'Role holder receives goals or outcomes and independently determines their own methods, priorities, and approach — without day-to-day managerial oversight of HOW work is done. Active for autonomous professional roles (e.g. clinical practitioners, legal advisers, policy analysts, specialist researchers, senior consultants) who manage their own caseload or work programme. Having a reporting line to a manager does NOT disqualify — most professional roles report to someone. NOT active when the JD describes the role as primarily assisting or supporting a specific named person ("supports the Director of X", "assists the CEO with Y") or when the role executes a manager-directed schedule (e.g. operator, driver, technician following shift assignments).',
   },
   {
     key: 'coordinates_team_work',
@@ -183,7 +183,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Wyznacza wizję przedsiębiorstwa',
     label_en: 'Sets enterprise vision',
     label_de: 'Legt die Unternehmensvision fest',
-    guidance_en: 'Role shapes the strategic direction of the whole enterprise — not just a function or division. Active for roles with explicit enterprise-wide strategic mandate: CEO, Managing Director, General Counsel with enterprise legal strategy, or equivalent. Does NOT require the word "vision" — "leads the enterprise", "sets strategic direction for the organisation", "defines long-term enterprise strategy" all qualify. (N=1 anchor — treat as high-confidence signal when evidence is explicit.)',
+    guidance_en: 'Role holds ultimate authority over the overall strategic direction of the whole enterprise — typically the CEO, Managing Director, Accountable Officer, or the most senior legal/commercial officer with mandate over the entire organisation\'s strategy. NOT active for roles that lead a specific function or portfolio (Head of Innovation, Director of Finance, Chief Technology Officer) even if their work shapes organisation-wide priorities — those are functional leaders, not enterprise-level strategic authorities. The signal is formal authority OVER THE WHOLE ORGANISATION, not influence on it. (N=1 anchor — only mark active when evidence of enterprise-level strategic authority is explicit.)',
   },
 ];
 

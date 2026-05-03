@@ -152,7 +152,46 @@ Zone match: 2/15 (13%)   Band match: 4/15 (27%)
 Systematic bias: +1 zone for mid-range; under-fires by 1–3 at zone 7–9
 ```
 
-### Phase 4 baseline (after Goals 1–3) — to be filled
+### Phase 4 Goal 1 result (guidance_en rewrite + re-capture)
 ```
-Zone match: ?/15   Band match: ?/15
+Zone match: 6/15 (40%)   Band match: 2/15 (13%)
+Matches: G-05 (aesthetician Z3), G-06 (train driver Z3), G-07 (counsellor Z4),
+         G-09 (Head Rail Reform Z5), G-10 (Head Service Design Z6),
+         G-11 (Head Innovation Z6)
 ```
+
+**Per-fixture active-key analysis:**
+| ID | Oracle Z | Engine Z | Active R keys | Δ |
+|----|----------|----------|---------------|---|
+| G-01 | 1 | 2 | little_discretion, structured_assignments, follows_verbal_written_instructions, structured_environment | +1 |
+| G-02 | 1 | 2 | little_discretion, close_supervision, structured_assignments, structured_environment, solves_recurring_problems | +1 |
+| G-03 | 2 | 3 | structured_assignments, structured_environment, solves_recurring_problems | +1 |
+| G-04 | 2 | 3 | little_discretion, structured_assignments, follows_verbal_written_instructions, structured_environment, solves_recurring_problems | +1 |
+| G-05 | 3 | 3 | structured_assignments, structured_environment, solves_recurring_problems | ✓ |
+| G-06 | 3 | 3 | little_discretion, structured_assignments, follows_verbal_written_instructions, structured_environment, solves_recurring_problems | ✓ |
+| G-07 | 4 | 4 | structured_environment, general_direction, [varies] | ✓ |
+| G-08 | 5 | 6 | general_direction, impact_beyond_team | +1 |
+| G-09 | 5 | 5 | general_direction, coordinates_team_work, impact_beyond_team | ✓ |
+| G-10 | 6 | 6 | impact_beyond_team, org_wide_impact | ✓ |
+| G-11 | 6 | 6 | general_direction, impact_beyond_team, org_wide_impact, [varies] | ✓ |
+| G-12 | 7 | 6 | general_direction, impact_beyond_team | -1 |
+| G-13 | 7 | 6 | general_direction, coordinates_team_work, impact_beyond_team, org_wide_impact | -1 |
+| G-14 | 8 | 7 | coordinates_team_work, impact_beyond_team, org_wide_impact, reports_to_board, sets_enterprise_vision | -1 |
+| G-15 | 9 | 6 | general_direction, coordinates_team_work, impact_beyond_team, org_wide_impact | -3 |
+
+**Remaining failure patterns after Goal 1:**
+- Z1–Z2 roles (G-01–G-04): systematic +1 over due to arithmetic mean — `structured_environment` (m_zone=3.21) always pulls mean above Z1 cutoff (1.5). Formula fix needed (Goal 2).
+- Z5 under-coverage (G-08): `general_direction`+`impact_beyond_team` → 5.51 → Z6 (oracle Z5). One mid-anchor short.
+- Z7 under-coverage (G-12, G-13): `org_wide_impact` under-fires or insufficient high-zone keys. Mean 6.x stays below Z7 threshold (6.5).
+- Z8–Z9 (G-14, G-15): high-zone markers (`member_executive_committee`, `reports_to_board`, `sets_enterprise_vision`) under-fire or mean arithmetic insufficient to reach Z8+.
+
+**Guidance changes that did NOT work as intended:**
+- `structured_environment` / `solves_recurring_problems`: first attempt too restrictive → G-05 dropped to Z1 (regression). Second pass fixed.
+- `sets_enterprise_vision` N=1 tightening: correctly stopped false positive in G-11 (Head of Innovation → no longer fires) while preserving G-14 (Chief Executives).
+- `general_direction` relaxation to allow autonomous professional roles: correctly activated for counsellor (G-07), analyst (G-09), but may also activate for G-08 (Principal Solicitor, +1 over remains).
+
+**Guidance changes that worked:**
+- `general_direction`: exclusion of "support/assist" roles without blocking autonomous professionals → G-07 ✓, G-09 ✓
+- `sets_enterprise_vision`: restricted to top-org authority → G-11 ✓ (was Z7, now Z6)
+- `org_wide_impact`: broadened to public sector language → G-10 was already correct; G-12, G-13 still under-fire
+- `reports_to_board`: broadened to governing bodies → fires in G-14 (Chief Executives) ✓
