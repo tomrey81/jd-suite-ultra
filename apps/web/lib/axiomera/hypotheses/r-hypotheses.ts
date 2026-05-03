@@ -67,7 +67,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Ustrukturyzowane zadania',
     label_en: 'Structured assignments',
     label_de: 'Strukturierte Aufgaben',
-    guidance_en: 'Assignments are predefined and structured, not open-ended.',
+    guidance_en: 'Task scope is fully defined before work begins — what to do, how to do it, and success criteria are all prescribed. Active ONLY when the role has NO latitude to plan or structure its own work. Exclude roles that plan projects, manage workstreams, or determine how to meet objectives, even if they operate within a broader framework.',
   },
   {
     key: 'follows_verbal_written_instructions',
@@ -83,7 +83,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Ustrukturyzowane środowisko pracy',
     label_en: 'Structured work environment',
     label_de: 'Strukturiertes Arbeitsumfeld',
-    guidance_en: 'Work happens within defined procedures and rules.',
+    guidance_en: 'Work is governed by SOPs, regulations, or procedural frameworks so tightly that any deviation requires explicit supervisory authorisation. Active only for roles where strict adherence to rules IS the primary mode of work. Not active merely because a role operates within a regulated sector or uses documented processes — most professional roles do.',
   },
   {
     key: 'solves_recurring_problems',
@@ -91,7 +91,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Rozwiązuje powtarzalne problemy',
     label_en: 'Solves recurring problems',
     label_de: 'Löst wiederkehrende Probleme',
-    guidance_en: 'Problems encountered are known patterns with established solutions.',
+    guidance_en: 'Applies established procedures to diagnose and resolve problem types the role has encountered before — following known templates rather than developing new approaches. Active when JD explicitly says problems are "standard", "routine", or references checklists/established procedures. NOT active merely because the role performs repetitive tasks or works within a defined scope.',
   },
 
   // === LEVEL 2 — MODERATE (autonomy, coordination, beyond-team impact) ===
@@ -101,7 +101,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Decyduje co eskalować',
     label_en: 'Determines what to escalate',
     label_de: 'Entscheidet über Eskalationen',
-    guidance_en: 'Judgement used to decide which issues go to higher authority.',
+    guidance_en: 'Role holder exercises genuine professional judgment to decide WHAT issues or exceptions are significant enough to escalate to higher authority. Active when JD describes autonomy over issue classification (e.g. "identifies complex cases for escalation", "decides when to involve senior management"). NOT active for roles that merely follow prescribed escalation procedures or are required to refer all non-routine matters to a supervisor.',
   },
   {
     key: 'general_direction',
@@ -109,7 +109,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Działa pod ogólnym kierunkiem',
     label_en: 'Works under general direction',
     label_de: 'Arbeitet unter allgemeiner Anleitung',
-    guidance_en: 'Receives goals/outcomes, determines methods independently.',
+    guidance_en: 'Role holder receives goals or outcomes and independently determines their own methods, priorities, and pace — without managerial oversight of HOW work is done. Active only when autonomy over method is explicit (e.g. "works independently", "self-directed", "no day-to-day supervision", "sets own work programme"). NOT active for roles that "support", "assist", or "report to" a named director/manager — those signal directed work, not general direction.',
   },
   {
     key: 'coordinates_team_work',
@@ -159,7 +159,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Wpływ ogólnoorganizacyjny',
     label_en: 'Organisation-wide impact',
     label_de: 'Organisationsweite Wirkung',
-    guidance_en: 'Decisions affect the entire organisation, not just a function.',
+    guidance_en: 'Decisions or outputs affect the whole organisation or its entire workforce, not just one department or function. In public sector / government: decisions shape policy, service standards, legal compliance, or resource allocation for the whole authority or department. Active when role holds enterprise-wide mandate — broader than "cross-functional"; scope must be organisational or authority-wide.',
   },
   {
     key: 'member_executive_committee',
@@ -175,7 +175,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Raportuje do zarządu / rady nadzorczej',
     label_en: 'Reports to board',
     label_de: 'Berichtet an den Vorstand / Aufsichtsrat',
-    guidance_en: 'Direct reporting line to board of directors.',
+    guidance_en: 'Role has a formal reporting or accountability relationship to a governing body — board of directors, trustees, non-executive directors, supervisory board, governing council, parent-entity board, or equivalent governance body. Active even when language is indirect: "accountable to the Board", "presents to trustees", "works with the governing body", "reports to the Audit Committee".',
   },
   {
     key: 'sets_enterprise_vision',
@@ -183,7 +183,7 @@ export const R_HYPOTHESES: RHypothesis[] = [
     label_pl: 'Wyznacza wizję przedsiębiorstwa',
     label_en: 'Sets enterprise vision',
     label_de: 'Legt die Unternehmensvision fest',
-    guidance_en: 'Role sets the vision/direction for the whole enterprise (typically CEO/MD). (N=1 — flag as low-confidence.)',
+    guidance_en: 'Role shapes the strategic direction of the whole enterprise — not just a function or division. Active for roles with explicit enterprise-wide strategic mandate: CEO, Managing Director, General Counsel with enterprise legal strategy, or equivalent. Does NOT require the word "vision" — "leads the enterprise", "sets strategic direction for the organisation", "defines long-term enterprise strategy" all qualify. (N=1 anchor — treat as high-confidence signal when evidence is explicit.)',
   },
 ];
 
