@@ -11,13 +11,7 @@ import {
   type Edge,
   type NodeMouseHandler,
   Position,
-  type NodeTypes,
-  type EdgeTypes,
 } from 'reactflow';
-
-// Stable empty maps prevent React Flow's "nodeTypes/edgeTypes changed" warning
-const NODE_TYPES: NodeTypes = {};
-const EDGE_TYPES: EdgeTypes = {};
 import 'reactflow/dist/style.css';
 import { ExportMenu } from '@/components/export/export-menu';
 
@@ -308,7 +302,6 @@ export default function PmoaOrgPage() {
             </div>
           ) : (
             <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick}
-              nodeTypes={NODE_TYPES} edgeTypes={EDGE_TYPES}
               fitView fitViewOptions={{ padding: 0.2 }}
               minZoom={0.2} maxZoom={2}
               proOptions={{ hideAttribution: true }}>
