@@ -31,6 +31,7 @@ import { buildRMockResponse, buildEMockResponse } from '@/lib/golden/claude-mock
 import { extractR } from './extract-r';
 import { extractE } from './extract-e';
 import { computeGrade, gradeToBand } from './compose';
+import { sPointsFromEduExp } from './hypotheses/s-scale';
 import { deriveLegacyHypothesisFlags } from './legacy-hypothesis-bridge';
 
 // ---------------------------------------------------------------------------
@@ -145,9 +146,11 @@ describe('G-7 Golden test harness', () => {
     const rResult = await extractR(fixture.jd_text);
     const eResult = await extractE(fixture.jd_text);
 
-    // S defaults to 90 (S2) — no Edu/Exp declared in fixtures
-    const S_DEFAULT = 90;
-    const grade = computeGrade(rResult.r_points, S_DEFAULT, eResult.e_pkt);
+    // S: use declared_edu + declared_exp if present (v1.1.0+), else fall back to 90 (S2)
+    const sPkt = (fixture.declared_edu && fixture.declared_exp)
+      ? sPointsFromEduExp(fixture.declared_edu, fixture.declared_exp)
+      : 90;
+    const grade = computeGrade(rResult.r_points, sPkt, eResult.e_pkt);
     const band = gradeToBand(grade);
     const expectedBand = oracleBand(fixture.expected_grades.oracle_consensus.grade_level);
 
