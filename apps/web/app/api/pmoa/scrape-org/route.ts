@@ -1,10 +1,10 @@
 /**
  * POST /api/pmoa/scrape-org
  *
- * Fetches the corporate website (main page + common sub-paths like /team,
- * /about, /leadership) and asks Claude to extract departments and positions.
- * Creates PmoaDepartment + PmoaPosition records in the DB for this org,
- * marking them as sourced from the website scrape so they can be reviewed.
+ * Fetches the corporate website (main page + a broad set of common sub-paths)
+ * and asks Claude to extract the FULL department/position hierarchy — not just
+ * executives. Also attempts to discover and follow org-structure-related links
+ * found on the main page.
  *
  * DOES NOT wipe existing data — new records are additive.
  * Duplicate positions (same name) are skipped to avoid clobbering manual edits.
@@ -21,35 +21,78 @@ import { db } from '@jd-suite/db';
 import { requireOrgScope, isScopeError } from '@/lib/pmoa/auth-scope';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const Body = z.object({ url: z.string().url().max(2048) });
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// Sub-paths commonly used for team/leadership/org pages
-const ORG_SUB_PATHS = ['/about', '/about-us', '/team', '/our-team', '/leadership', '/management', '/people', '/company'];
+// Common sub-paths for org/team/leadership pages — English + Polish + Spanish + German
+const ORG_SUB_PATHS = [
+  // English
+  '/about', '/about-us', '/team', '/our-team', '/leadership', '/management',
+  '/people', '/company', '/org-chart', '/organizational-structure',
+  '/corporate-governance', '/board', '/board-of-directors', '/executives',
+  '/departments', '/structure', '/who-we-are', '/meet-the-team',
+  // Polish
+  '/o-nas', '/o-firmie', '/zarzad', '/wladze', '/kierownictwo',
+  '/struktura-organizacyjna', '/struktura', '/organizacja', '/regulamin',
+  '/rada-nadzorcza', '/pracownicy', '/zespol', '/kierownictwo-firmy',
+  // Common corporate
+  '/governance', '/investor-relations/governance', '/ir/governance',
+  '/en/about', '/en/team', '/en/leadership', '/en/structure',
+];
+
+// Keywords that suggest an org/structure page
+const ORG_LINK_KEYWORDS = [
+  'org', 'team', 'people', 'leadership', 'management', 'board', 'executive',
+  'director', 'department', 'structure', 'governance', 'about',
+  'zarzad', 'kierownictwo', 'struktura', 'organizacja', 'o-nas', 'pracownicy',
+];
 
 function extractText(html: string): string {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, ' ')
+    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 8000);
+    .trim();
 }
 
-async function tryFetch(url: string): Promise<string> {
+/** Extract href values from <a> tags in raw HTML */
+function extractLinks(html: string, base: string): string[] {
+  const hrefs: string[] = [];
+  const re = /href=["']([^"'#?]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1].trim();
+    if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
+    try {
+      const absolute = href.startsWith('http') ? href : new URL(href, base).href;
+      // Only same-domain links
+      if (new URL(absolute).hostname === new URL(base).hostname) {
+        hrefs.push(absolute);
+      }
+    } catch {
+      // skip malformed
+    }
+  }
+  return hrefs;
+}
+
+async function tryFetch(url: string): Promise<{ text: string; html: string }> {
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; JDSuiteBot/1.0)' },
-      signal: AbortSignal.timeout(8000),
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; JDSuiteBot/1.0; +https://jd-suite-ultra.vercel.app)' },
+      signal: AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return '';
-    return extractText(await res.text());
+    if (!res.ok) return { text: '', html: '' };
+    const html = await res.text();
+    return { text: extractText(html).slice(0, 12_000), html };
   } catch {
-    return '';
+    return { text: '', html: '' };
   }
 }
 
@@ -65,44 +108,71 @@ export async function POST(req: NextRequest) {
   const { url } = parsed.data;
   const base = new URL(url).origin;
 
-  // Fetch main page + probe sub-paths in parallel
-  const pages = await Promise.all([
-    tryFetch(url),
-    ...ORG_SUB_PATHS.map((p) => tryFetch(base + p)),
-  ]);
+  // 1. Fetch main page first to discover org-related links
+  const mainPage = await tryFetch(url);
+  const discoveredLinks: string[] = [];
 
-  const corpus = pages.filter(Boolean).join('\n\n---\n\n').slice(0, 24000);
+  if (mainPage.html) {
+    const allLinks = extractLinks(mainPage.html, base);
+    for (const link of allLinks) {
+      const path = new URL(link).pathname.toLowerCase();
+      if (ORG_LINK_KEYWORDS.some((kw) => path.includes(kw))) {
+        discoveredLinks.push(link);
+      }
+    }
+  }
+
+  // 2. Fetch known sub-paths + discovered links in parallel (deduplicated)
+  const urlsToProbe = [
+    ...ORG_SUB_PATHS.map((p) => base + p),
+    ...discoveredLinks,
+  ];
+  const uniqueUrls = [...new Set(urlsToProbe)].slice(0, 60); // cap at 60 probes
+
+  const results = await Promise.all(uniqueUrls.map((u) => tryFetch(u)));
+
+  // Build corpus: main page first, then sub-paths that returned content
+  const allTexts = [
+    mainPage.text,
+    ...results.map((r) => r.text),
+  ].filter(Boolean);
+
+  // Cap total corpus at 48k chars (fits in ~12k tokens)
+  const corpus = allTexts.join('\n\n---\n\n').slice(0, 48_000);
 
   if (!corpus.trim()) {
     return NextResponse.json({ error: 'Could not fetch any readable content from the website.' }, { status: 422 });
   }
 
-  // Extract org structure via Claude
-  const prompt = `You are extracting organisational structure from a corporate website.
-Analyse the text below and return a JSON object with two arrays:
+  // 3. Extract org structure via Claude — use Sonnet for deeper reasoning
+  const prompt = `You are extracting the COMPLETE organisational structure from a corporate website. Extract ALL levels — not just executives. Include every department, division, bureau, team, and every named position/role you can identify.
 
-"departments": array of objects with:
-  - name: string (department or division name)
-  - parent: string | null (parent department name, if known)
-  - headPositionName: string | null (title of the head of this department)
+Return a JSON object with two arrays:
 
-"positions": array of objects with:
-  - name: string (job title / role name)
-  - department: string | null (which department it belongs to)
-  - reportsTo: string | null (job title this role reports to)
+"departments": array of objects:
+  - name: string (department / division / bureau / team name)
+  - parent: string | null (parent department name if known)
+  - headPositionName: string | null (title of the department head)
+
+"positions": array of objects:
+  - name: string (job title / role name — as specific as possible)
+  - department: string | null (which department)
+  - reportsTo: string | null (job title this role reports to — must match another position's name exactly)
   - currentHolderName: string | null (person's name if mentioned)
-  - vacancy: boolean (true if listed as open/vacant)
+  - vacancy: boolean
 
-Rules:
-- Only include what you can confidently extract — omit fields you cannot determine
-- Do not invent data
-- Keep names consistent (same spelling across departments and positions)
-- Prefer specific titles over vague ones
-- If the site is not a corporate/company site, return {"departments":[],"positions":[]}
+CRITICAL RULES:
+1. Extract EVERY level of the hierarchy visible in the text — level 1 (CEO/President), level 2 (VP/Director), level 3 (Department Head), level 4 (Manager), level 5+ (Team Lead, Specialist) — whatever is present.
+2. If the text mentions department codes (e.g. DAD, DK, DSEK), include them in the department name.
+3. Preserve original language (Polish, English, etc.) — do not translate.
+4. For each position, carefully determine "reportsTo" based on the structure shown.
+5. If you see a list of departments under a VP/Director, create that VP as a position AND all departments as children of their division.
+6. Do not invent data. Do not omit data that is present.
+7. If the site is not a corporate/company site, return {"departments":[],"positions":[]}.
 
 Website: ${url}
 
-Text:
+Text content from ${allTexts.filter(Boolean).length} pages:
 ---
 ${corpus}
 ---
@@ -112,8 +182,8 @@ Respond with ONLY valid JSON, no markdown, no explanation.`;
   let extracted: { departments: any[]; positions: any[] };
   try {
     const msg = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8192,
       messages: [{ role: 'user', content: prompt }],
     });
     const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
@@ -171,7 +241,7 @@ Respond with ONLY valid JSON, no markdown, no explanation.`;
       deptCreated++;
     }
 
-    // Resolve dept parents (only for newly created ones)
+    // Resolve dept parents
     for (const d of extracted.departments) {
       const name = String(d.name || '').trim();
       const parent = String(d.parent || '').trim();
@@ -229,7 +299,7 @@ Respond with ONLY valid JSON, no markdown, no explanation.`;
         await tx.pmoaDepartment.update({ where: { id: deptId }, data: { headPositionId: headId } });
       }
     }
-  });
+  }, { timeout: 60_000 });
 
   return NextResponse.json({
     ok: true,
@@ -237,5 +307,6 @@ Respond with ONLY valid JSON, no markdown, no explanation.`;
     positions: posCreated,
     skipped,
     url,
+    pagesScraped: allTexts.filter(Boolean).length,
   });
 }

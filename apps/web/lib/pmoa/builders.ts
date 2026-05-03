@@ -65,7 +65,7 @@ export interface ProcessBuildResult {
 
 // ── Org builder ────────────────────────────────────────────────────────────
 
-const ORG_SYSTEM_PROMPT = `You are an organisation analyst. The user has uploaded HR documents (HRIS rosters, org charts, regulations). Extract a unified org graph.
+const ORG_SYSTEM_PROMPT = `You are an expert HR data analyst specialising in organisational structure extraction. The user has uploaded HR documents (HRIS rosters, org charts, regulation documents, internal directories). Extract the COMPLETE, FULL-DEPTH org graph — every level, every department, every position mentioned.
 
 Output STRICT JSON only:
 {
@@ -91,16 +91,20 @@ Output STRICT JSON only:
   "globalClarifications": string[]
 }
 
-Rules:
-- Position names must be canonical (deduplicate spelling variants).
-- "reportsTo" must reference another position's "name" exactly, or null for top of tree.
-- spanOfControl = count of direct reports (positions whose reportsTo equals this position's name).
-- A position can be vacant. "currentHolderName" should be null in that case.
-- For acting roles, create one assignment with kind="acting" + the temporary holder.
-- For split assignments, create TWO assignments — one per position, each pointing at the other via splitWithPosition + splitPct.
-- NEVER invent positions not in the source. If a document mentions a person but no position, omit them.
-- globalClarifications: questions you'd ask the user about ambiguous structures.
-- Output JSON only — no prose, no markdown fences.`;
+CRITICAL RULES — read carefully:
+1. Extract EVERY department and position at EVERY level. Do not stop at executive/VP level. Extract Directors, Managers, Team Leads, Specialists, Analysts — all levels mentioned.
+2. If a document lists 50 departments, return all 50. If it lists 200 positions, return all 200. Do not truncate.
+3. Position names must be canonical (deduplicate spelling variants). Polish/multilingual names are fine — preserve as-is.
+4. "reportsTo" must reference another position's "name" exactly, or null for top of tree.
+5. spanOfControl = count of direct reports (positions whose reportsTo equals this position's name).
+6. A position can be vacant. "currentHolderName" should be null in that case.
+7. For acting roles, create one assignment with kind="acting" + the temporary holder.
+8. For split assignments, create TWO assignments — one per position, each pointing at the other via splitWithPosition + splitPct.
+9. NEVER invent positions not in the source. If a document mentions a person but no position, omit them.
+10. Hierarchical clues: if a document uses indentation, numbering (1.1, 1.2.3), headers, table columns labelled "supervisor"/"manager"/"przełożony"/"kierownik", use those to infer reporting lines.
+11. Department codes (e.g. DAD, DK, DSP) are valid — include them in the position/department name or notes.
+12. globalClarifications: questions you'd ask the user about ambiguous structures.
+13. Output JSON only — no prose, no markdown fences. The JSON must be complete and valid.`;
 
 const PROCESS_SYSTEM_PROMPT = `You are a process analyst. The user has uploaded SOPs, regulations, and BPMN/flowchart files. Extract structured business processes.
 
@@ -173,7 +177,7 @@ interface CorpusEntry { id: string; name: string; rawText: string; }
 
 export async function buildOrgFromCorpus(corpus: CorpusEntry[]): Promise<OrgBuildResult> {
   const message = formatCorpus(corpus);
-  const raw = await callClaude(ORG_SYSTEM_PROMPT, message, 6000);
+  const raw = await callClaude(ORG_SYSTEM_PROMPT, message, 16000);
   const parsed = parseStrictJSON(raw) as OrgBuildResult;
   // Defensive normalisation
   if (!Array.isArray(parsed.departments)) parsed.departments = [];
@@ -198,8 +202,8 @@ export async function buildProcessesFromCorpus(corpus: CorpusEntry[]): Promise<P
 
 function formatCorpus(corpus: CorpusEntry[]): string {
   // Cap each doc + total length to keep within token budget.
-  const PER_DOC_CAP = 8_000;
-  const TOTAL_CAP = 100_000;
+  const PER_DOC_CAP = 20_000;
+  const TOTAL_CAP = 180_000;
   let totalUsed = 0;
   const blocks: string[] = [];
   for (const d of corpus) {
