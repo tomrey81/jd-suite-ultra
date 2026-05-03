@@ -302,5 +302,13 @@
     "cs": "Čeština",
     "ro": "Rumunština",
     "sv": "Švédština"
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Otevřít Krystynu (Cmd+J)",
+    "tagline": "Váš AI asistent pro pracovní popisy",
+    "thinking": "Krystyna přemýšlí…",
+    "errorFallback": "Krystyna je momentálně nedostupná.",
+    "proposes": "Krystyna navrhuje — lidé rozhodují."
   }
 }

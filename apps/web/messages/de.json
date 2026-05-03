@@ -302,5 +302,13 @@
     "cs": "Tschechisch",
     "ro": "Rumänisch",
     "sv": "Schwedisch"
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Krystyna öffnen (Cmd+J)",
+    "tagline": "Ihre KI-Assistentin für Stellenbeschreibungen",
+    "thinking": "Krystyna denkt nach…",
+    "errorFallback": "Krystyna ist gerade nicht verfügbar.",
+    "proposes": "Krystyna schlägt vor — Menschen entscheiden."
   }
 }

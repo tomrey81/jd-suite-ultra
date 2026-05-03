@@ -302,5 +302,13 @@
     "cs": "Cehă",
     "ro": "Română",
     "sv": "Suedeză"
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Deschide Krystyna (Cmd+J)",
+    "tagline": "Asistenta dvs. AI pentru fișe de post",
+    "thinking": "Krystyna se gândește…",
+    "errorFallback": "Krystyna nu este disponibilă momentan.",
+    "proposes": "Krystyna propune — oamenii decid."
   }
 }

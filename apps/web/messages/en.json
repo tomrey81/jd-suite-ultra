@@ -402,5 +402,13 @@
       "template": "JD Template",
       "inference": "AI Inference"
     }
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Open Krystyna (Cmd+J)",
+    "tagline": "Your JD work assistant",
+    "thinking": "Krystyna is thinking…",
+    "errorFallback": "Krystyna is unavailable right now.",
+    "proposes": "Krystyna proposes — humans decide."
   }
 }

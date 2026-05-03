@@ -302,5 +302,13 @@
     "cs": "Tjeckiska",
     "ro": "Rumänska",
     "sv": "Svenska"
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Öppna Krystyna (Cmd+J)",
+    "tagline": "Din AI-assistent för jobbbeskrivningar",
+    "thinking": "Krystyna tänker…",
+    "errorFallback": "Krystyna är inte tillgänglig just nu.",
+    "proposes": "Krystyna föreslår — människor bestämmer."
   }
 }

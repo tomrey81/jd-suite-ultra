@@ -269,6 +269,8 @@ enum JDStatus {
   UNDER_REVISION
   APPROVED
   ARCHIVED
+  PUBLISHED
+  REJECTED
 }
 
 model JobDescription {

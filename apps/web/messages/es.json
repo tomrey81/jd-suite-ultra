@@ -302,5 +302,13 @@
     "cs": "Checo",
     "ro": "Rumano",
     "sv": "Sueco"
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Abrir Krystyna (Cmd+J)",
+    "tagline": "Tu asistente IA para descripciones de puestos",
+    "thinking": "Krystyna está pensando…",
+    "errorFallback": "Krystyna no está disponible en este momento.",
+    "proposes": "Krystyna propone — los humanos deciden."
   }
 }

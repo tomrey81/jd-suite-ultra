@@ -302,5 +302,13 @@
     "cs": "Czeski",
     "ro": "Rumuński",
     "sv": "Szwedzki"
+  },
+  "krystyna": {
+    "name": "Krystyna",
+    "openLauncher": "Otwórz Krystynę (Cmd+J)",
+    "tagline": "Twój asystent do pracy z opisami stanowisk",
+    "thinking": "Krystyna pracuje nad odpowiedzią…",
+    "errorFallback": "Krystyna jest chwilowo niedostępna.",
+    "proposes": "Krystyna proponuje — człowiek decyduje."
   }
 }

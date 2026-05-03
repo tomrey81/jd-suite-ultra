@@ -85,3 +85,19 @@ Format: `[YYYY-MM-DD] [PHASE] [TYPE] description`. Types: DECISION, COPY, REWRIT
 - ⚠️ Golden test set NOT yet implemented (deterministic math + counts tested instead). Phase 2 task: build 10 golden JDs and compare full Axiomera pipeline output against fixed expected ranges.
 
 **Next:** Apply migration to a real Neon DB (`pnpm db:migrate:dev --name phase1-axiomera-ai-usage`), enable `ENABLE_AXIOMERA_ENGINE=true` in a staging env, run a real audit, validate output, then enable `ENABLE_AXIOMERA_SHADOW_MODE=false` after admin review.
+
+---
+
+## 2026-05-03 — Phase 2
+
+**[2026-05-03] [P2] [SCHEMA]** Added PUBLISHED and REJECTED to `JDStatus` enum in `packages/db/prisma/schema.prisma`. Backward compatible — existing JDs remain in {DRAFT, UNDER_REVISION, APPROVED, ARCHIVED}. New values only set when `ENABLE_APPROVAL_WORKFLOW=true`.
+
+**[2026-05-03] [P2] [WRITE]** Approval workflow API routes: advance, approve, reject, withdraw, resubmit, GET history. All gated by `FLAGS.APPROVAL_WORKFLOW`. Each action writes both JDVersion (STATUS_CHANGE) + ApprovalRecord in a transaction — one-source-of-truth invariant maintained.
+
+**[2026-05-03] [P2] [WRITE]** `components/approval/approval-panel.tsx` — client component with stage badge, action buttons, timeline. Gracefully handles flag=OFF (fetches API, gets 404, renders nothing).
+
+**[2026-05-03] [P2] [WRITE]** `app/api/jdq/programs/route.ts` + `[id]/seal/route.ts` — sealed programs API. `app/admin/programs/page.tsx` — sealed programs admin UI with create + seal actions. Gated by `FLAGS.SEALED_PROGRAMS`.
+
+**[2026-05-03] [P2] [WRITE]** Added `krystyna.*` translation keys to all 9 locale files. Polish locale uses feminine grammatical forms. Companion widget already shows "Krystyna" (reads from localStorage). Keys available for future use behind `ENABLE_KRYSTYNA_RENAME` flag.
+
+**Next:** Apply Phase 2 DB migration (`pnpm db:migrate:dev --name phase2-jdstatus-published-rejected`), enable `ENABLE_APPROVAL_WORKFLOW=true` in staging, run acceptance tests AW-T1 through AW-T10.
