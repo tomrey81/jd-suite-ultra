@@ -290,3 +290,53 @@ Goal 1 → Goal 3 → Goal 4 → Goal 2
 | `general_direction` inconsistency | Audit guidance_en for this key; Claude's interpretation diverges from oracle in both directions |
 | Bands all A2/A5 | Goal 4 (Edu/Exp on fixtures) must be done before band match is meaningful |
 | Systematic +1 zone bias for mid-range | Consider floor/ceiling adjustment in `computeWeightedZone` or tighter activation thresholds |
+
+---
+
+### Phase 3 Goal 4 baseline (declared Edu/Exp) — 2026-05-03
+
+Fixture version bumped to v1.1.0. `declared_edu` and `declared_exp` (SLevel 1–5) populated for
+all 15 fixtures, derived from oracle raw text using midpoint-of-range for exp year bands
+and edu-level interpretation of qualification descriptions (methodology in §Goal 4 above).
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║              G-7 BASELINE REPORT — engine vs oracle             ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Zone match:  2/15 (13%)  Band match: 4/15 (27%)                ║
+║  Borderline fixtures: 4                                         ║
+╠══════════════════════════════════════════════════════════════════╣
+║  ID    Title                         Z↑  Ze  Band↑ Bande  Match ║
+║  G-01  forklift operator             1   2   A1    A2     ✗✗   ║
+║  G-02  Pharmacy Aides                1   3   A1    A1     ✗✓   ║
+║  G-03  ski lift operator             2   3   A2    A3     ✗✗   ║
+║  G-04  automated optical inspection  2   3   A2    A2     ✗✓   ║
+║  G-05  aesthetician                  3   3   B1    A2     ✓✗   ║
+║  G-06  train driver                  3   4   B1    A3     ✗✗   ║
+║  G-07  sexual violence counsellor    4   5   B2    B1     ✗✗   ║
+║  G-08  Principal Solicitor           5   6   C1    B2     ✗✗   ║
+║  G-09  Head of Rail Reform Analysis  5   6   C1    B3     ✗✗   ║
+║  G-10  Head of Service Design        6   6   C2    B3     ✓✗   ║
+║  G-11  Head of Innovation, Science   6   7   C2    B4     ✗✗   ║
+║  G-12  Legal Adviser to Chancellor   7   6   D1    B4     ✗✗   ║
+║  G-13  Assistant Director Procure.   7   6   D1    B3     ✗✗   ║
+║  G-14  Chief Executives              8   7   D2    C2     ✗✗   ║
+║  G-15  Associate General Counsel     9   6   E     B5     ✗✗   ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+**Delta from Phase 3 Goal 1 baseline (S=90 all):**
+- Band match: 2/15 → 4/15 (+2). G-02 and G-04 gained correct band matches.
+- Bands no longer cluster at A2/A5 — now distributed A1–E, B1–B5 range.
+- Zone match unchanged at 2/15 — zone is R-only, unaffected by S.
+- Remaining band failures: S score is now realistic but engine zone over/under-firing dominates.
+  G-15 engine=6 oracle=9 is a 3-zone gap — no S value can close that; R prompt tuning needed.
+
+**Derivation notes (pending Tomasz review):**
+- 8/15 fixtures had no exp year range in oracle → derived from zone level.
+- 7/15 fixtures had no edu text → derived from role archetype (zone 1–3 = vocational edu=2;
+  zone 6–9 = bachelor's/master's based on seniority).
+- G-12 edu text is the reporting hierarchy (Master of the Rolls), not education requirement →
+  inferred edu=5 from senior legal adviser role type.
+- edu=3 (HS/technical secondary) unused — no fixture had this qualification level.
+- Flag any disagreements against the oracle grading sheets for correction in v1.2.0.
