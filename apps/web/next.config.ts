@@ -5,6 +5,13 @@ const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@jd-suite/db', '@jd-suite/types'],
+  serverExternalPackages: ['canvas'],
+  webpack: (config) => {
+    // pdfjs-dist bundles a canvas dependency that isn't available in Vercel
+    // build/runtime — mark it external so webpack doesn't try to bundle it.
+    config.resolve.alias.canvas = false;
+    return config;
+  },
   async headers() {
     return [
       {

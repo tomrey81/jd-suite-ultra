@@ -415,12 +415,9 @@ async function renderPdfToImages(
 ): Promise<PageRender[]> {
   // Dynamic import keeps pdfjs out of the SSR bundle
   const pdfjs = await import('pdfjs-dist');
-  // Use the bundled worker via blob URL — avoids needing to host pdf.worker.mjs
+  // Use CDN-hosted worker — avoids webpack trying to resolve ?url query syntax
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url' as string).catch(() => null);
-    if (worker && typeof worker === 'object' && 'default' in worker) {
-      pdfjs.GlobalWorkerOptions.workerSrc = (worker as { default: string }).default;
-    }
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
   }
 
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(arrayBuf) });
