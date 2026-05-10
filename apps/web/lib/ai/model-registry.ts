@@ -103,7 +103,10 @@ const OPERATION_TIER_DEFAULTS: Record<string, ModelTier> = {
   // Phase 5+ — placeholders
   'regulation.extract.chunks': 'sonnet',
   'regulation.extract.tags': 'haiku',
-  'regulation.embed': 'embedding-small',
+  // NOTE: 'regulation.embed' will need 'embedding-small' once an OpenAI provider is
+  // implemented. Using 'sonnet' here so any accidental call fails loudly rather
+  // than sending an OpenAI model ID to the Anthropic endpoint.
+  'regulation.embed': 'sonnet',
   'regulation.suggestForJd': 'sonnet',
   'report.generateSummary': 'sonnet',
 };
