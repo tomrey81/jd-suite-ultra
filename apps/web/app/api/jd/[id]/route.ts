@@ -5,17 +5,18 @@ import { z } from 'zod';
 
 const updateJDSchema = z.object({
   data: z.record(z.string(), z.string().nullable()).optional(),
-  jobTitle: z.string().optional(),
-  jobCode: z.string().nullable().optional(),
-  orgUnit: z.string().nullable().optional(),
+  jobTitle: z.string().max(500).optional(),
+  jobCode: z.string().max(100).nullable().optional(),
+  orgUnit: z.string().max(200).nullable().optional(),
   status: z.enum(['DRAFT', 'UNDER_REVISION', 'APPROVED', 'ARCHIVED']).optional(),
-  folder: z.string().nullable().optional(),
-  sortOrder: z.number().optional(),
-  careerFamily: z.string().nullable().optional(),
-  archivedAt: z.string().nullable().optional(), // ISO string or null to restore
-  fieldChanged: z.string().optional(),
-  oldValue: z.string().optional(),
-  newValue: z.string().optional(),
+  folder: z.string().max(200).nullable().optional(),
+  sortOrder: z.number().int().optional(),
+  careerFamily: z.string().max(200).nullable().optional(),
+  // SEC-05: archivedAt removed from client-editable fields.
+  // Use DELETE /api/jd/[id] to archive, which sets archivedAt server-side.
+  fieldChanged: z.string().max(200).optional(),
+  oldValue: z.string().max(50_000).optional(),
+  newValue: z.string().max(50_000).optional(),
 });
 
 // GET /api/jd/[id]
@@ -71,8 +72,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (updates.folder !== undefined) updateData.folder = updates.folder;
       if (updates.sortOrder !== undefined) updateData.sortOrder = updates.sortOrder;
       if (updates.careerFamily !== undefined) updateData.careerFamily = updates.careerFamily;
-      if (updates.archivedAt !== undefined) {
-        updateData.archivedAt = updates.archivedAt ? new Date(updates.archivedAt) : null;
+      // SEC-05: archivedAt is set server-side based on status, never directly from client.
+      // ARCHIVED status → set archivedAt; any other status → clear archivedAt (restore).
+      if (updates.status === 'ARCHIVED') {
+        updateData.archivedAt = new Date();
+      } else if (updates.status !== undefined) {
+        updateData.archivedAt = null;
       }
 
       const updated = await tx.jobDescription.update({
@@ -87,8 +92,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (updates.status) {
         changeType = 'STATUS_CHANGE';
         note = `Status changed to ${updates.status}`;
-      } else if (updates.archivedAt !== undefined) {
-        note = updates.archivedAt ? 'Moved to trash' : 'Restored from trash';
       } else if (updates.folder !== undefined) {
         note = updates.folder ? `Moved to folder "${updates.folder}"` : 'Removed from folder';
       } else if (updates.careerFamily !== undefined) {

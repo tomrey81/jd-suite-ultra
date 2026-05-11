@@ -18,16 +18,35 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: [
           {
+            // SEC-03: full CSP — not just frame-ancestors.
+            // 'unsafe-inline' required by Next.js App Router (no nonce setup yet).
             key: 'Content-Security-Policy',
-            value: "frame-ancestors 'self' https://thetotalrewardsacademy2026.vercel.app https://*.vercel.app http://localhost:*",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data:",
+              "media-src 'self' blob:",
+              "worker-src 'self' blob:",
+              "connect-src 'self' https://api.anthropic.com https://*.neon.tech https://*.vercel.app",
+              // SEC-08: restrict to specific known domains, not wildcard *.vercel.app
+              "frame-ancestors 'self' https://thetotalrewardsacademy2026.vercel.app",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "object-src 'none'",
+            ].join('; '),
           },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // SEC-08: belt-and-suspenders for older browsers that ignore CSP frame-ancestors
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // SEC-04: HSTS — enforce HTTPS for 1 year
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
           {
             key: 'Permissions-Policy',
-            // microphone=(self) allows this page to request mic permission (required for
-            // Web Speech API in Krystyna and VoiceInput). Camera and geolocation remain blocked.
-            value: 'camera=(), microphone=(self), geolocation=()',
+            // SEC-15: block dangerous browser APIs; microphone=(self) for Web Speech API (Krystyna/VoiceInput)
+            value: 'camera=(), microphone=(self), geolocation=(), payment=(), usb=(), serial=(), bluetooth=(), display-capture=()',
           },
         ],
       },

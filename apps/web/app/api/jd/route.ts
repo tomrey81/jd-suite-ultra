@@ -3,6 +3,14 @@ import { getSession } from '@/lib/get-session';
 import { db } from '@jd-suite/db';
 import { z } from 'zod';
 
+// SEC-06: validate query params to prevent oversized strings reaching Prisma
+const listQuerySchema = z.object({
+  folder: z.string().max(200).optional(),
+  careerFamily: z.string().max(200).optional(),
+  includeTrashed: z.enum(['true', 'false']).optional(),
+  trashedOnly: z.enum(['true', 'false']).optional(),
+});
+
 const createJDSchema = z.object({
   templateId: z.string().uuid().optional(),
   data: z.record(z.string(), z.string().nullable()).default({}),
@@ -23,12 +31,15 @@ export async function GET(req: Request) {
   if (!orgId) return NextResponse.json({ error: 'No organisation' }, { status: 403 });
 
   const url = new URL(req.url);
-  const folder = url.searchParams.get('folder');
-  const careerFamily = url.searchParams.get('careerFamily');
-  const includeTrashed = url.searchParams.get('includeTrashed') === 'true';
-  const trashedOnly = url.searchParams.get('trashedOnly') === 'true';
+  const qp = listQuerySchema.safeParse(Object.fromEntries(url.searchParams));
+  if (!qp.success) return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
 
-  const where: any = { orgId };
+  const folder = qp.data.folder;
+  const careerFamily = qp.data.careerFamily;
+  const includeTrashed = qp.data.includeTrashed === 'true';
+  const trashedOnly = qp.data.trashedOnly === 'true';
+
+  const where: Record<string, unknown> = { orgId };
   if (trashedOnly) {
     where.archivedAt = { not: null };
   } else if (!includeTrashed) {

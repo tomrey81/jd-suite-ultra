@@ -10,7 +10,9 @@ type Mode = 'password' | 'magic';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  // SEC-02: validate callbackUrl is a relative path to prevent open redirect
+  const rawCallback = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = rawCallback.startsWith('/') && !rawCallback.startsWith('//') ? rawCallback : '/';
   const justReset = searchParams.get('reset') === 'ok';
   const justRegistered = searchParams.get('registered') === 'true';
 
