@@ -796,16 +796,30 @@ export function AICompanion() {
     );
   }
 
-  // Panel - mobile-first widths
+  // Panel - anchored near launcher position, clamped to viewport
+  const panelW = size === 'expanded' ? 480 : 380;
+  const panelH = size === 'expanded' ? 680 : 520;
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const panelLeft = Math.min(Math.max(pos.x - panelW / 2, 8), vw - panelW - 8);
+  const panelTop = Math.min(Math.max(pos.y - panelH - 16, 8), vh - panelH - 8);
+
   const panelClass =
     size === 'fullscreen'
       ? 'fixed inset-2 z-[70] sm:inset-4'
-      : size === 'expanded'
-      ? 'fixed bottom-3 right-3 z-[70] h-[80vh] w-[calc(100vw-24px)] max-h-[680px] sm:bottom-6 sm:right-6 sm:h-[680px] sm:w-[480px]'
-      : 'fixed bottom-3 right-3 z-[70] h-[70vh] w-[calc(100vw-24px)] max-h-[520px] sm:bottom-6 sm:right-6 sm:h-[520px] sm:w-[380px]';
+      : 'fixed z-[70] h-[70vh] w-[calc(100vw-24px)] max-h-[520px] sm:h-auto sm:w-auto';
+
+  const panelStyle = size === 'fullscreen'
+    ? {}
+    : {
+        left: panelLeft,
+        top: panelTop,
+        width: panelW,
+        height: panelH,
+      };
 
   return (
-    <div className={cn(panelClass, 'flex flex-col overflow-hidden rounded-xl border border-border-default bg-white shadow-2xl')}>
+    <div className={cn(panelClass, 'flex flex-col overflow-hidden rounded-xl border border-border-default bg-white shadow-2xl')} style={panelStyle}>
       {/* Header */}
       <div className="shrink-0 border-b border-border-default bg-surface-header px-4 py-3">
         <div className="flex items-center gap-3">
