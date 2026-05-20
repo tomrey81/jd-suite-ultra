@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useJDStore } from '@/hooks/use-jd-store';
+import { useUIStore } from '@/hooks/use-ui-store';
 import { cn } from '@/lib/utils';
 
 interface Message {
@@ -30,6 +31,7 @@ const STORAGE_LAUNCHER_POS = 'krystyna:launcher:pos';
 const STORAGE_PANEL_SIZE = 'krystyna:panel:size';
 const STORAGE_HISTORY = 'krystyna:history';
 const STORAGE_SETTINGS = 'jdgc_settings';
+export const STORAGE_DISMISSED = 'krystyna:dismissed';
 
 interface CompanionSettings {
   name: string;
@@ -340,6 +342,9 @@ export function AICompanion() {
   const pathname = usePathname();
   const { jdId, jd, dqsScore, ersScore } = useJDStore();
 
+  // Dismissed state — shared via Zustand so the header button can react without events
+  const { krystynaDismissed: dismissed, setKrystynaDismissed: setDismissed } = useUIStore();
+
   // Launcher position
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 24, y: 24 });
   const [dragging, setDragging] = useState(false);
@@ -391,6 +396,17 @@ export function AICompanion() {
   // Restore persisted state on mount + handle viewport resizes
   useEffect(() => {
     voiceSupported.current = !!getSR();
+    // Load dismissed state from localStorage on mount (persists across page reloads)
+    try {
+      if (localStorage.getItem(STORAGE_DISMISSED) === '1') setDismissed(true);
+    } catch { /* ignore */ }
+    // Listen for "krystyna:show" dispatched from the header button
+    const onShow = () => {
+      try { localStorage.removeItem(STORAGE_DISMISSED); } catch { /* ignore */ }
+      setDismissed(false);
+      setOpen(true);
+    };
+    window.addEventListener('krystyna:show', onShow);
     // Load companion settings from localStorage
     const cs = loadCompanionSettings();
     setCompanionName(cs.name);
@@ -438,7 +454,10 @@ export function AICompanion() {
       });
     };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('krystyna:show', onShow);
+    };
   }, [defaultPos]);
 
   // Double-click to reset launcher to bottom-right corner
@@ -729,37 +748,61 @@ export function AICompanion() {
     try { sessionStorage.removeItem(STORAGE_HISTORY); } catch { /* ignore */ }
   };
 
+  const dismiss = () => {
+    setOpen(false);
+    setDismissed(true);
+    try { localStorage.setItem(STORAGE_DISMISSED, '1'); } catch { /* ignore */ }
+  };
+
   // ---------- Render ----------
+
+  // Dismissed: render nothing (header shows the re-open button)
+  if (dismissed) return null;
 
   // Launcher (when closed)
   if (!open) {
     return (
       <div
-        role="button"
-        aria-label={`Open ${companionName} AI Companion (Cmd+J)`}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onDoubleClick={resetPos}
-        title={`${companionName} · drag to move · double-click to reset position · Cmd/Ctrl+J to open`}
         className={cn(
-          'fixed z-[60] flex h-14 w-14 cursor-grab select-none items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-shadow hover:shadow-xl',
-          dragging && 'cursor-grabbing shadow-2xl',
+          'fixed z-[60] group select-none',
         )}
         style={{ left: pos.x, top: pos.y, touchAction: 'none' }}
       >
-        <CompanionAvatar avatarSetting={companionAvatar} mood="idle" size={44} />
+        <div
+          role="button"
+          aria-label={`Open ${companionName} AI Companion (Cmd+J)`}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onDoubleClick={resetPos}
+          title={`${companionName} · drag to move · double-click to reset position · Cmd/Ctrl+J to open`}
+          className={cn(
+            'flex h-14 w-14 cursor-grab items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 transition-shadow hover:shadow-xl',
+            dragging && 'cursor-grabbing shadow-2xl',
+          )}
+        >
+          <CompanionAvatar avatarSetting={companionAvatar} mood="idle" size={44} />
+        </div>
+        {/* Dismiss button — visible on hover, hides launcher entirely */}
+        <button
+          onClick={(e) => { e.stopPropagation(); dismiss(); }}
+          aria-label={`Hide ${companionName}`}
+          title={`Hide ${companionName} (re-open from the header)`}
+          className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-text-primary text-[9px] font-bold text-white shadow transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+        >
+          ✕
+        </button>
       </div>
     );
   }
 
-  // Panel
+  // Panel - mobile-first widths
   const panelClass =
     size === 'fullscreen'
-      ? 'fixed inset-4 z-[70]'
+      ? 'fixed inset-2 z-[70] sm:inset-4'
       : size === 'expanded'
-      ? 'fixed bottom-6 right-6 z-[70] h-[680px] w-[480px]'
-      : 'fixed bottom-6 right-6 z-[70] h-[520px] w-[380px]';
+      ? 'fixed bottom-3 right-3 z-[70] h-[80vh] w-[calc(100vw-24px)] max-h-[680px] sm:bottom-6 sm:right-6 sm:h-[680px] sm:w-[480px]'
+      : 'fixed bottom-3 right-3 z-[70] h-[70vh] w-[calc(100vw-24px)] max-h-[520px] sm:bottom-6 sm:right-6 sm:h-[520px] sm:w-[380px]';
 
   return (
     <div className={cn(panelClass, 'flex flex-col overflow-hidden rounded-xl border border-border-default bg-white shadow-2xl')}>

@@ -1,5 +1,6 @@
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { withSentryConfig } from '@sentry/nextjs';
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -29,7 +30,8 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               "media-src 'self' blob:",
               "worker-src 'self' blob:",
-              "connect-src 'self' https://api.anthropic.com https://*.neon.tech https://*.vercel.app",
+              // Sentry ingest added to connect-src
+              "connect-src 'self' https://api.anthropic.com https://*.neon.tech https://*.vercel.app https://*.ingest.sentry.io https://*.ingest.de.sentry.io",
               // SEC-08: restrict to specific known domains, not wildcard *.vercel.app
               "frame-ancestors 'self' https://thetotalrewardsacademy2026.vercel.app",
               "base-uri 'self'",
@@ -54,4 +56,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default withSentryConfig(withNextIntl(nextConfig), {
+  org: 'quadrance',
+  project: 'jdsuite',
+
+  // Source map upload — requires SENTRY_AUTH_TOKEN in env
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Don't print Sentry build output unless something fails
+  silent: !process.env.CI,
+
+  // Upload source maps but don't delete local copies
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: false,
+  },
+
+  // Suppress the Sentry tunnel route — not needed for this project
+  tunnelRoute: undefined,
+
+  webpack: {
+    autoInstrumentServerFunctions: false,
+    autoInstrumentMiddleware: false,
+  },
+});

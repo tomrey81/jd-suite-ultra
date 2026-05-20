@@ -80,7 +80,9 @@ export default function EUPTDReadinessPage() {
   const [lang, setLang] = useState<Lang>('en');
   const [answers, setAnswers] = useState<Record<string, AnswerRecord>>({});
   const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [savingItem, setSavingItem] = useState<string | null>(null);
   const [openItem, setOpenItem] = useState<string | null>(null);
   const [showBenchmarks, setShowBenchmarks] = useState(true);
@@ -89,20 +91,26 @@ export default function EUPTDReadinessPage() {
   const T = (k: keyof typeof I18N) => I18N[k][lang];
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/euptd-readiness');
-        if (!res.ok || cancelled) return;
-        const data = await res.json();
+    const controller = new AbortController();
+    setLoading(true);
+    setLoadError(null);
+    fetch('/api/euptd-readiness', { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) return res.json().catch(() => ({})).then((e) => { throw new Error(e.error || `Request failed (${res.status})`); });
+        return res.json();
+      })
+      .then((data) => {
         setAnswers(data.answers || {});
         setMembers(data.members || []);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setLoadError(err.message || 'Network error');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, [retryKey]);
 
   const plainAnswers: Record<string, Answer> = useMemo(() => {
     const out: Record<string, Answer> = {};
@@ -259,6 +267,17 @@ export default function EUPTDReadinessPage() {
         <div className="mx-auto max-w-[1100px] p-6">
           {loading ? (
             <div className="text-center text-[12px] text-text-muted">Loading…</div>
+          ) : loadError ? (
+            <div className="rounded-lg border border-danger/30 bg-danger-bg p-6 text-center">
+              <div className="mb-1 text-[13px] font-semibold text-danger">Could not load readiness data</div>
+              <div className="text-[11px] text-danger/80">{loadError}</div>
+              <button
+                onClick={() => { setLoadError(null); setLoading(true); setRetryKey((k) => k + 1); }}
+                className="mt-4 rounded-md bg-brand-gold px-4 py-2 text-[11px] font-medium text-white"
+              >
+                Retry
+              </button>
+            </div>
           ) : (
             <>
               <div className="mb-4 rounded-md bg-info-bg p-3 text-[11px] text-info">

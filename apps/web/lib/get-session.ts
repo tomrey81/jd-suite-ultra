@@ -1,18 +1,23 @@
+import { auth } from '@/lib/auth';
 import { db } from '@jd-suite/db';
+import { logger } from '@/lib/logger';
 
-// TEMPORARY BYPASS — returns first user and org for all requests
-// Replace with real auth() call when auth is properly configured
 export async function getSession() {
-  const user = await db.user.findFirst();
-  if (!user) return null;
+  const session = await auth();
+  if (!session?.user?.id) return null;
 
-  const membership = await db.membership.findFirst({
-    where: { userId: user.id },
-  });
+  let membership = null;
+  try {
+    membership = await db.membership.findFirst({
+      where: { userId: session.user.id },
+    });
+  } catch (err) {
+    logger.warn('db.cold-start', err, { userId: session.user.id });
+  }
 
   return {
-    user: { id: user.id, email: user.email, name: user.name },
-    orgId: membership?.orgId,
-    orgRole: membership?.role,
+    user: { id: session.user.id, email: session.user.email ?? '', name: session.user.name ?? null },
+    orgId: (session as any).orgId ?? membership?.orgId,
+    orgRole: (session as any).orgRole ?? membership?.role,
   };
 }
