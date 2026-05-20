@@ -55,8 +55,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const emailConfigured = !!process.env.RESEND_API_KEY;
   return NextResponse.json({
     ok: true,
-    message: 'If an account exists for that email, a sign-in link has been sent.',
+    emailConfigured,
+    message: emailConfigured
+      ? 'If an account exists for that email, a sign-in link has been sent.'
+      : 'Email is not configured on this instance.',
   });
 }
