@@ -46,18 +46,19 @@ function log(level: LogLevel, event: string, detail?: unknown, meta?: Meta) {
 
   // Forward errors and warnings to Sentry (server-side only; client uses automatic capture)
   if (typeof window === 'undefined' && (level === 'error' || level === 'warn')) {
-    // Dynamic import avoids bundling Sentry into paths that don't need it
+    // Sentry SeverityLevel uses 'warning' not 'warn'
+    const sentryLevel = level === 'warn' ? 'warning' as const : 'error' as const;
     import('@sentry/nextjs').then(({ captureException, captureMessage, withScope }) => {
       if (detail instanceof Error) {
         withScope((scope) => {
-          scope.setLevel(level);
+          scope.setLevel(sentryLevel);
           scope.setContext('meta', { event, ...(meta ?? {}) });
           captureException(detail);
         });
       } else {
         captureMessage(
           `${event}${typeof detail === 'string' ? ': ' + detail : ''}`,
-          { level, extra: { event, detail, ...(meta ?? {}) } },
+          { level: sentryLevel, extra: { event, detail, ...(meta ?? {}) } },
         );
       }
     }).catch(() => { /* Sentry unavailable — don't crash */ });
