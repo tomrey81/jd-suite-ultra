@@ -5,6 +5,8 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
+type Mode = 'password' | 'magic';
+
 const SOCIAL_PROVIDERS = [
   { id: 'google', label: 'Continue with Google', icon: GoogleIcon },
 ] as const;
@@ -20,16 +22,20 @@ function GoogleIcon() {
   );
 }
 
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  // SEC-02: validate callbackUrl is a relative path to prevent open redirect
+  const rawCallback = searchParams.get('callbackUrl') || '/';
+  const callbackUrl = rawCallback.startsWith('/') && !rawCallback.startsWith('//') ? rawCallback : '/';
   const justReset = searchParams.get('reset') === 'ok';
   const justRegistered = searchParams.get('registered') === 'true';
 
+  const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [magicSent, setMagicSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
@@ -43,6 +49,32 @@ function LoginForm() {
       setError('Invalid email or password.');
     } else {
       router.push(callbackUrl);
+    }
+  };
+
+  const handleMagic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      const res = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (data.emailConfigured === false) {
+          setError('Email sending is not configured on this instance. Use password login instead.');
+        } else {
+          setMagicSent(true);
+        }
+      } else {
+        setError(data.error || 'Could not send link');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,28 +123,82 @@ function LoginForm() {
           <div className="relative flex justify-center"><span className="bg-white px-3 text-[10px] text-text-muted">or sign in with email</span></div>
         </div>
 
-        <form onSubmit={handlePassword} className="space-y-4">
-          {error && <div className="rounded-lg bg-danger-bg px-4 py-3 text-sm text-danger">{error}</div>}
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-text-primary">Email address</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com" required className={inputCls} />
-          </div>
-          <div>
-            <div className="mb-1 flex items-baseline justify-between">
-              <label className="text-xs font-semibold text-text-primary">Password</label>
-              <Link href="/forgot-password" className="text-[10px] text-brand-gold hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="Your password" required minLength={8} className={inputCls} />
-          </div>
-          <button type="submit" disabled={loading}
-            className="w-full rounded-md bg-brand-gold px-4 py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-40">
-            {loading ? 'Signing in…' : 'Sign in'}
+        {/* Mode toggle */}
+        <div className="mb-4 flex gap-1 rounded-md border border-border-default p-1 bg-surface-page">
+          <button type="button" onClick={() => { setMode('password'); setMagicSent(false); setError(''); }}
+            className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors ${mode === 'password' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted'}`}>
+            Password
           </button>
-        </form>
+          <button type="button" onClick={() => { setMode('magic'); setError(''); }}
+            className={`flex-1 rounded px-3 py-1.5 text-xs font-medium transition-colors ${mode === 'magic' ? 'bg-white text-text-primary shadow-sm' : 'text-text-muted'}`}>
+            Magic link
+          </button>
+        </div>
+
+        {mode === 'password' ? (
+          <form onSubmit={handlePassword} className="space-y-4">
+            {error && <div className="rounded-lg bg-danger-bg px-4 py-3 text-sm text-danger">{error}</div>}
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-text-primary">Email address</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com" required className={inputCls} />
+            </div>
+            <div>
+              <div className="mb-1 flex items-baseline justify-between">
+                <label className="text-xs font-semibold text-text-primary">Password</label>
+                <Link href="/forgot-password" className="text-[10px] text-brand-gold hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your password" required minLength={8} className={inputCls + ' pr-10'} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? '🙈' : '👁'}
+                </button>
+              </div>
+            </div>
+            <button type="submit" disabled={loading}
+              className="w-full rounded-md bg-brand-gold px-4 py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-40">
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        ) : magicSent ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">
+              <strong>Check your inbox.</strong>
+              <p className="mt-1 text-xs leading-relaxed">
+                If an account exists for <strong>{email}</strong>, we&apos;ve sent a one-time sign-in link.
+                It expires in 15 minutes.
+              </p>
+            </div>
+            <button type="button" onClick={() => { setMagicSent(false); setEmail(''); }}
+              className="text-xs text-brand-gold hover:underline">
+              Use a different email
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleMagic} className="space-y-4">
+            {error && <div className="rounded-lg bg-danger-bg px-4 py-3 text-sm text-danger">{error}</div>}
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-text-primary">Email address</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com" required className={inputCls} />
+              <p className="mt-1.5 text-[10px] leading-relaxed text-text-muted">
+                We&apos;ll email you a link that signs you in instantly. No password needed.
+              </p>
+            </div>
+            <button type="submit" disabled={loading || !email}
+              className="w-full rounded-md bg-text-primary px-4 py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-40">
+              {loading ? 'Sending…' : 'Email me a sign-in link'}
+            </button>
+          </form>
+        )}
 
         <div className="mt-6 text-center text-xs text-text-muted">
           Don&apos;t have an account?{' '}

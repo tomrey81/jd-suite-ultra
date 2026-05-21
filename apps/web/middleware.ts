@@ -16,9 +16,15 @@ const PUBLIC_PREFIXES = [
   '/favicon',
 ];
 
+const ADMIN_PREFIXES = ['/admin', '/api/admin'];
+
 function isPublic(path: string) {
   if (PUBLIC_PATHS.has(path)) return true;
   return PUBLIC_PREFIXES.some((p) => path.startsWith(p));
+}
+
+function isAdminRoute(path: string) {
+  return ADMIN_PREFIXES.some((p) => path.startsWith(p));
 }
 
 export function middleware(req: NextRequest) {
@@ -26,7 +32,10 @@ export function middleware(req: NextRequest) {
 
   if (isPublic(pathname)) return NextResponse.next();
 
-  // Crude session check: next-auth JWT cookie
+  // Session check: next-auth JWT cookie presence. NextAuth issues encrypted
+  // JWE tokens (5 parts) that cannot be decoded in Edge middleware without
+  // the secret. Authentication and admin checks are delegated to server-side
+  // auth() calls in layouts and route handlers.
   const sessionCookie =
     req.cookies.get('next-auth.session-token') ||
     req.cookies.get('__Secure-next-auth.session-token') ||
@@ -34,8 +43,6 @@ export function middleware(req: NextRequest) {
     req.cookies.get('__Secure-authjs.session-token');
 
   if (!sessionCookie) {
-    // API requests: return 401 JSON (let route handlers' own guards do
-    // finer-grained admin checks too). Non-API: redirect.
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -49,6 +56,10 @@ export function middleware(req: NextRequest) {
     url.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(url);
   }
+
+  // Admin routes: session cookie presence is confirmed above. The admin
+  // layout calls requireAdmin() which performs full auth() + DB verification
+  // of the isPlatformAdmin flag. No fast-check needed here.
 
   return NextResponse.next();
 }

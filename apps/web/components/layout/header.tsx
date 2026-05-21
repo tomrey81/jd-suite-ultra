@@ -2,10 +2,13 @@
 
 import { signOut } from 'next-auth/react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { useJDStore } from '@/hooks/use-jd-store';
+import { useUIStore } from '@/hooks/use-ui-store';
 import { buildText } from '@/lib/jd-helpers';
 import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
+import { STORAGE_DISMISSED } from '@/components/ai/ai-companion';
 
 interface HeaderProps {
   user: {
@@ -17,17 +20,22 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   const pathname = usePathname();
-  // Only show JD-editor controls (DC %, Export, Honest Review, End for Now,
-  // Evaluate) when the route is actually a JD detail page. Upload, bulk-import,
-  // and the "new" placeholder page do not have a JD to act on.
   const NON_EDITOR_JD_ROUTES = new Set(['/jd', '/jd/new', '/jd/input', '/jd/bulk-import']);
   const isJDEditor =
     pathname.startsWith('/jd/') &&
     !NON_EDITOR_JD_ROUTES.has(pathname) &&
     !pathname.startsWith('/jd/bulk-import');
 
+  // Track whether Krystyna is dismissed so we can show the re-open button
+  const { krystynaDismissed, setKrystynaDismissed } = useUIStore();
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(STORAGE_DISMISSED) === '1') setKrystynaDismissed(true);
+    } catch { /* ignore */ }
+  }, [setKrystynaDismissed]);
+
   return (
-    <header className="flex h-[60px] shrink-0 items-center justify-between bg-surface-header px-6">
+    <header className="grid h-[60px] shrink-0 grid-cols-[auto_1fr_auto] items-center gap-2 bg-surface-header px-6">
       {/* Left: Wordmark */}
       <a href="/" className="cursor-pointer select-none">
         <span className="font-display text-[17px] tracking-[0.25em] text-text-on-dark/90">
@@ -35,18 +43,36 @@ export function Header({ user }: HeaderProps) {
         </span>
       </a>
 
-      {/* Center: JD context pill */}
-      {isJDEditor && (
-        <div className="absolute left-1/2 -translate-x-1/2">
-          <div className="flex items-center gap-3 rounded-full bg-white/[0.07] px-5 py-1.5 backdrop-blur-sm">
+      {/* Center: JD context pill (flex centered, never overlaps left/right) */}
+      <div className="flex min-w-0 items-center justify-center">
+        {isJDEditor && (
+          <div className="flex min-w-0 items-center gap-3 rounded-full bg-white/[0.07] px-5 py-1.5 backdrop-blur-sm">
             <JDHeaderControls />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Right: Actions + User */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {isJDEditor && <JDHeaderActions />}
+        {krystynaDismissed && (
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('krystyna:show'))}
+            title="Open Krystyna AI Companion"
+            aria-label="Open Krystyna AI Companion"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.08] transition-colors hover:bg-white/[0.16]"
+          >
+            <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="48" fill="#FAFAF7" stroke="#1A1A1A" strokeWidth="2.4" />
+              <circle cx="50" cy="62" r="22" fill="#F4D3B3" stroke="#1A1A1A" strokeWidth="1.8" />
+              <circle cx="44" cy="62" r="1.8" fill="#1A1A1A" />
+              <circle cx="56" cy="62" r="1.8" fill="#1A1A1A" />
+              <path d="M27 41 Q27 19 50 19 Q73 19 73 41 L73 44 L27 44 Z" fill="#D8392A" stroke="#1A1A1A" strokeWidth="2" />
+              <path d="M16 44 Q50 53 84 44 L82 49 Q50 53 18 49 Z" fill="#D8392A" stroke="#1A1A1A" strokeWidth="2" />
+              <polygon points="50,30 56.5,33.5 56.5,40.5 50,44 43.5,40.5 43.5,33.5" fill="#F2C633" stroke="#1A1A1A" strokeWidth="1.5" />
+            </svg>
+          </button>
+        )}
         <LanguageSwitcher />
         <div className="ml-1 flex items-center gap-2.5 rounded-full bg-white/[0.07] py-1.5 pl-4 pr-1.5">
           <span className="text-[12px] tracking-wide text-text-on-dark/50">
@@ -257,11 +283,11 @@ function JDHeaderActions() {
   const spinnerEl = <span className="inline-block h-3 w-3 animate-spin rounded-full border-[1.5px] border-white/30 border-t-white" />;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       {/* Export */}
       <button
         onClick={handleExport}
-        className="rounded-full border border-white/[0.08] px-4 py-1.5 text-[11px] font-medium tracking-wide text-text-on-dark/50 transition-all hover:border-white/20 hover:text-text-on-dark/80"
+        className="rounded-full border border-white/[0.08] px-3 py-1 text-[11px] font-medium tracking-wide text-text-on-dark/50 transition-all hover:border-white/20 hover:text-text-on-dark/80"
         title="Export JD in multiple formats"
       >
         Export
@@ -271,17 +297,17 @@ function JDHeaderActions() {
       <button
         onClick={handleHonestReview}
         disabled={!hasTitle || !hasMeaningfulContent || honestReviewLoading}
-        className="inline-flex items-center gap-1.5 rounded-full bg-[#4F46E5]/80 px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-[#4F46E5] disabled:opacity-35"
+        className="inline-flex items-center gap-1 rounded-full bg-[#4F46E5]/80 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-[#4F46E5] disabled:opacity-35"
         title={!hasMeaningfulContent ? 'Add more content before reviewing' : 'AI honest assessment of JD quality'}
       >
-        {honestReviewLoading ? <>{spinnerEl} Reviewing…</> : 'Honest Review'}
+        {honestReviewLoading ? <>{spinnerEl} Reviewing…</> : 'Review'}
       </button>
 
       {/* End for Now */}
       <button
         onClick={handleEndForNow}
         disabled={endSessionLoading}
-        className="inline-flex items-center gap-1.5 rounded-full bg-brand-gold/90 px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-brand-gold disabled:opacity-40"
+        className="inline-flex items-center gap-1 rounded-full bg-brand-gold/90 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-brand-gold disabled:opacity-40"
         title="Save progress and get AI session summary"
       >
         {endSessionLoading ? <>{spinnerEl} Saving…</> : 'End for Now'}
@@ -291,7 +317,7 @@ function JDHeaderActions() {
       <button
         onClick={handleEvaluate}
         disabled={!hasTitle || evalLoading}
-        className="inline-flex items-center gap-1.5 rounded-full bg-cat-skills/80 px-4 py-1.5 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-cat-skills disabled:opacity-35"
+        className="inline-flex items-center gap-1 rounded-full bg-cat-skills/80 px-3 py-1 text-[11px] font-medium tracking-wide text-white/90 transition-all hover:bg-cat-skills disabled:opacity-35"
         title="Run ILO-aligned 16-criteria pay equity evaluation"
       >
         {evalLoading ? <>{spinnerEl} Evaluating…</> : 'Evaluate'}

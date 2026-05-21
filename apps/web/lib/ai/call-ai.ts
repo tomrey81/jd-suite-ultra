@@ -65,39 +65,85 @@ function estimateTokens(s: string): number {
   return Math.ceil(s.length / 4);
 }
 
+// Transient Anthropic status codes that are safe to retry.
+const RETRYABLE_STATUS = new Set([429, 529]);
+// Abort a single Anthropic call after this many ms — kept below Vercel's 60s limit.
+const ANTHROPIC_TIMEOUT_MS = 50_000;
+
 async function callAnthropic(
   model: ModelEntry,
   opts: CallAiOptions,
 ): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+
+  // Embedding tiers reference OpenAI model IDs — no OpenAI provider exists.
+  // Calling them would silently send an OpenAI model name to the Anthropic endpoint and fail.
+  if (model.tier === 'embedding-small' || model.tier === 'embedding-large') {
+    throw new Error(
+      `callAi: tier "${model.tier}" requires an OpenAI provider which is not implemented. ` +
+        'Use sonnet/haiku, or implement an OpenAI provider path in callAi.',
+    );
+  }
+
   const body: Record<string, unknown> = {
     model: model.modelId,
-    max_tokens: opts.maxTokens ?? 3000,
+    max_tokens: opts.maxTokens ?? 4096,
     temperature: opts.temperature ?? 0,
     messages: [{ role: 'user', content: opts.userPrompt }],
   };
   if (opts.systemPrompt) body.system = opts.systemPrompt;
+  const bodyStr = JSON.stringify(body);
 
-  const res = await fetch(ANTHROPIC_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Claude API ${res.status}: ${errText}`);
+  const MAX_ATTEMPTS = 3;
+  let lastError: Error = new Error('Unknown error');
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ANTHROPIC_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(ANTHROPIC_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: bodyStr,
+        signal: controller.signal,
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as AnthropicResponse;
+        const block = data.content?.[0];
+        const text = block?.type === 'text' ? (block.text ?? '') : '';
+        const inputTokens =
+          data.usage?.input_tokens ??
+          estimateTokens(opts.userPrompt + (opts.systemPrompt ?? ''));
+        const outputTokens = data.usage?.output_tokens ?? estimateTokens(text);
+        return { text, inputTokens, outputTokens };
+      }
+
+      const errText = await res.text();
+      lastError = new Error(`Claude API ${res.status}: ${errText}`);
+
+      if (!RETRYABLE_STATUS.has(res.status)) throw lastError;
+
+      // Retryable: exponential back-off before next attempt.
+      await new Promise((r) => setTimeout(r, 1_000 * Math.pow(2, attempt)));
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') {
+        throw new Error(`Claude API timed out after ${ANTHROPIC_TIMEOUT_MS / 1000}s`);
+      }
+      if (e !== lastError) lastError = e as Error;
+      if (!RETRYABLE_STATUS.has(0)) throw lastError; // non-retryable fetch errors
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  const data = (await res.json()) as AnthropicResponse;
-  const block = data.content?.[0];
-  const text = block?.type === 'text' ? (block.text ?? '') : '';
-  const inputTokens = data.usage?.input_tokens ?? estimateTokens(opts.userPrompt + (opts.systemPrompt ?? ''));
-  const outputTokens = data.usage?.output_tokens ?? estimateTokens(text);
-  return { text, inputTokens, outputTokens };
+
+  throw lastError;
 }
 
 async function logUsage(args: {

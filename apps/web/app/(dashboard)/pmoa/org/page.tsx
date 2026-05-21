@@ -14,6 +14,7 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { ExportMenu } from '@/components/export/export-menu';
+import type { ScrapedPage, CompanyIntel } from '@/lib/pmoa/web-scraper';
 
 interface PositionDTO {
   id: string;
@@ -36,8 +37,7 @@ interface AssignmentDTO {
   splitAllocations: unknown;
 }
 
-type ModalMode = 'add-position' | 'edit-position' | 'add-department' | null;
-
+// Lay out a tree top-down. Same layer = same y; siblings spread horizontally.
 function layoutTree(positions: PositionDTO[]): Map<string, { x: number; y: number }> {
   const idx = new Map(positions.map((p) => [p.id, p]));
   const children = new Map<string, string[]>();
@@ -51,7 +51,7 @@ function layoutTree(positions: PositionDTO[]): Map<string, { x: number; y: numbe
   const roots = positions.filter((p) => !p.reportsToId || !idx.has(p.reportsToId));
   const out = new Map<string, { x: number; y: number }>();
   const HSPACE = 230;
-  const VSPACE = 140;
+  const VSPACE = 130;
 
   function layoutSubtree(id: string, depth: number, leftCursor: { v: number }): number {
     const kids = children.get(id) || [];
@@ -71,30 +71,229 @@ function layoutTree(positions: PositionDTO[]): Map<string, { x: number; y: numbe
   const cursor = { v: 0 };
   for (const r of roots) {
     layoutSubtree(r.id, 0, cursor);
-    cursor.v += 1;
+    cursor.v += 1; // gap between forests
   }
   return out;
 }
 
-// ── Position form state ───────────────────────────────────────────────────────
-interface PositionForm {
-  name: string;
-  positionNumber: string;
-  departmentId: string;
-  reportsToId: string;
-  currentHolderName: string;
-  vacancy: boolean;
-}
-const emptyPositionForm = (): PositionForm => ({
-  name: '',
-  positionNumber: '',
-  departmentId: '',
-  reportsToId: '',
-  currentHolderName: '',
-  vacancy: false,
-});
+// ── Web Intel Modal ──────────────────────────────────────────────────────────
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+function WebIntelModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [intel, setIntel] = useState<CompanyIntel | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+
+  async function handleFetch() {
+    setFetching(true); setErr(null); setIntel(null); setSavedCount(null); setSelectedPages(new Set());
+    try {
+      const res = await fetch('/api/pmoa/fetch-web-intel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteUrl, companyName, isPublicCompany: isPublic }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error || 'Fetch failed'); return; }
+      setIntel(data.intel as CompanyIntel);
+      // Pre-select all pages
+      const all = new Set<string>();
+      for (const p of [...(data.intel.orgPages || []), ...(data.intel.irPages || []), ...(data.intel.newsPages || [])]) {
+        all.add(p.url);
+      }
+      setSelectedPages(all);
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!intel) return;
+    const allPages: ScrapedPage[] = [
+      ...(intel.orgPages || []),
+      ...(intel.irPages || []),
+      ...(intel.newsPages || []),
+    ].filter((p) => selectedPages.has(p.url));
+
+    if (allPages.length === 0) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/pmoa/save-web-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pages: allPages }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSavedCount(data.saved);
+        onSaved();
+      } else {
+        setErr(data.error || 'Save failed');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function togglePage(url: string) {
+    setSelectedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url); else next.add(url);
+      return next;
+    });
+  }
+
+  const allPages: ScrapedPage[] = intel
+    ? [...(intel.orgPages || []), ...(intel.irPages || []), ...(intel.newsPages || [])]
+    : [];
+
+  const categoryLabel = (c: ScrapedPage['category']) =>
+    c === 'org' ? 'Org / Leadership' : c === 'ir' ? 'Investor Relations' : 'News / Press';
+
+  const categoryColor = (c: ScrapedPage['category']) =>
+    c === 'org' ? '#8A7560' : c === 'ir' ? '#3B6EA5' : '#2E6B37';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="relative flex w-full max-w-2xl flex-col gap-4 rounded-xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="font-display text-base font-semibold text-text-primary">Fetch company web intelligence</h2>
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              Scrapes leadership, investor relations, and news pages. Saved pages become PMOA documents for org building.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-lg text-text-muted">×</button>
+        </div>
+
+        {/* Inputs */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-text-muted">Company website URL</label>
+            <input
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full rounded border border-border-default bg-surface-page px-3 py-2 text-[13px] outline-none focus:border-brand-gold"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-text-muted">Company name (optional)</label>
+            <input
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="ACME Corp"
+              className="w-full rounded border border-border-default bg-surface-page px-3 py-2 text-[13px] outline-none focus:border-brand-gold"
+            />
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-[12px] text-text-primary">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="accent-brand-gold"
+            />
+            Publicly traded company — also check investor relations pages
+          </label>
+
+          <button
+            onClick={handleFetch}
+            disabled={fetching || !websiteUrl.trim()}
+            className="rounded-md bg-brand-gold px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+          >
+            {fetching ? 'Scraping…' : 'Fetch intelligence'}
+          </button>
+        </div>
+
+        {err && (
+          <div className="rounded border border-danger bg-danger-bg px-3 py-2 text-[11px] text-danger">{err}</div>
+        )}
+
+        {/* Results */}
+        {intel && allPages.length === 0 && (
+          <p className="text-[12px] text-text-muted">No pages found. The site may block scrapers, or the URL paths differ from common patterns.</p>
+        )}
+
+        {allPages.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+              {allPages.length} pages found — select which to save as PMOA documents
+            </div>
+
+            {(['org', 'ir', 'news'] as const).map((cat) => {
+              const catPages = allPages.filter((p) => p.category === cat);
+              if (catPages.length === 0) return null;
+              return (
+                <div key={cat}>
+                  <div
+                    className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: categoryColor(cat) }}
+                  >
+                    {categoryLabel(cat)}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {catPages.map((p) => (
+                      <label
+                        key={p.url}
+                        className="flex cursor-pointer items-start gap-2.5 rounded border border-border-default p-2.5 hover:bg-surface-page"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPages.has(p.url)}
+                          onChange={() => togglePage(p.url)}
+                          className="mt-0.5 accent-brand-gold"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[12px] font-medium text-text-primary">{p.title || p.url}</div>
+                          <div className="truncate text-[10px] text-text-muted">{p.url}</div>
+                          <div className="mt-1 text-[10px] text-text-muted line-clamp-2">
+                            {p.text.slice(0, 200)}…
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {savedCount === null ? (
+              <button
+                onClick={handleSave}
+                disabled={saving || selectedPages.size === 0}
+                className="rounded-md bg-text-primary px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : `Save ${selectedPages.size} page(s) as PMOA documents`}
+              </button>
+            ) : (
+              <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-[12px] text-green-700">
+                ✓ {savedCount} document(s) saved to PMOA. You can now run &quot;Re-build from documents&quot; to include this data.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+
 export default function PmoaOrgPage() {
   const [positions, setPositions] = useState<PositionDTO[]>([]);
   const [departments, setDepartments] = useState<DepartmentDTO[]>([]);
@@ -105,26 +304,21 @@ export default function PmoaOrgPage() {
   const [globalClarifications, setGlobalClarifications] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [showWebIntel, setShowWebIntel] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Modal state
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [positionForm, setPositionForm] = useState<PositionForm>(emptyPositionForm());
-  const [deptName, setDeptName] = useState('');
-  const [deptParentId, setDeptParentId] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
+  // Build a flat row set for tabular export
   const exportRows = useMemo(() => {
-    const deptMap = new Map(departments.map((d) => [d.id, d.name]));
+    const deptName = new Map(departments.map((d) => [d.id, d.name]));
     return positions.map((p) => {
       const acting = assignments.find((a) => a.positionId === p.id && a.kind === 'acting');
       const split = assignments.find((a) => a.positionId === p.id && a.kind === 'split');
       return {
         positionNumber: p.positionNumber || '',
         name: p.name,
-        department: p.departmentId ? deptMap.get(p.departmentId) || '' : '',
+        department: p.departmentId ? deptName.get(p.departmentId) || '' : '',
         holder: p.vacancy ? '(vacant)' : (p.currentHolderName || ''),
         reportsTo: p.reportsToId ? positions.find((x) => x.id === p.reportsToId)?.name || '' : '',
         spanOfControl: p.spanOfControl,
@@ -168,90 +362,14 @@ export default function PmoaOrgPage() {
     }
   }
 
-  // Open modal for adding a position, optionally pre-filling reportsToId
-  function openAddPosition(defaultReportsToId?: string) {
-    const form = emptyPositionForm();
-    if (defaultReportsToId) form.reportsToId = defaultReportsToId;
-    setPositionForm(form);
-    setSaveErr(null);
-    setModalMode('add-position');
-  }
-
-  function openEditPosition(p: PositionDTO) {
-    setPositionForm({
-      name: p.name,
-      positionNumber: p.positionNumber || '',
-      departmentId: p.departmentId || '',
-      reportsToId: p.reportsToId || '',
-      currentHolderName: p.currentHolderName || '',
-      vacancy: p.vacancy,
-    });
-    setSaveErr(null);
-    setModalMode('edit-position');
-  }
-
-  function openAddDepartment() {
-    setDeptName('');
-    setDeptParentId('');
-    setSaveErr(null);
-    setModalMode('add-department');
-  }
-
-  async function savePosition() {
-    if (!positionForm.name.trim()) { setSaveErr('Position name is required'); return; }
-    setSaving(true); setSaveErr(null);
+  async function clearOrg() {
+    setClearing(true); setConfirmClear(false);
     try {
-      const body = {
-        name: positionForm.name.trim(),
-        positionNumber: positionForm.positionNumber.trim() || null,
-        departmentId: positionForm.departmentId || null,
-        reportsToId: positionForm.reportsToId || null,
-        currentHolderName: positionForm.currentHolderName.trim() || null,
-        vacancy: positionForm.vacancy,
-      };
-
-      let res: Response;
-      if (modalMode === 'edit-position' && selectedId) {
-        res = await fetch(`/api/pmoa/positions/${selectedId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      } else {
-        res = await fetch('/api/pmoa/positions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      }
-
-      const data = await res.json();
-      if (!res.ok) { setSaveErr(data.error || 'Save failed'); return; }
-      setModalMode(null);
-      await load();
+      await fetch('/api/pmoa/clear-org', { method: 'DELETE' });
+      setPositions([]); setDepartments([]); setAssignments([]);
+      setSelectedId(null); setGlobalClarifications([]);
     } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deletePosition(id: string) {
-    if (!confirm('Delete this position? Its direct reports will become top-level nodes.')) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/pmoa/positions/${id}`, { method: 'DELETE' });
-      if (res.ok) { setSelectedId(null); await load(); }
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  async function saveDepartment() {
-    if (!deptName.trim()) { setSaveErr('Department name is required'); return; }
-    setSaving(true); setSaveErr(null);
-    try {
-      const res = await fetch('/api/pmoa/departments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: deptName.trim(), parentId: deptParentId || null }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setSaveErr(data.error || 'Save failed'); return; }
-      setModalMode(null);
-      await load();
-    } finally {
-      setSaving(false);
+      setClearing(false);
     }
   }
 
@@ -281,7 +399,12 @@ export default function PmoaOrgPage() {
         targetPosition: Position.Top,
         data: { label: <NodeBox p={p} acting={acting?.personName} split={!!split} dimmed={dimmed} /> },
         type: 'default',
-        style: { background: 'transparent', border: 'none', padding: 0, width: 200 },
+        style: {
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          width: 200,
+        },
       } satisfies Node;
     });
   }, [positions, layoutPositions, assignments, filteredPositions, search]);
@@ -299,6 +422,7 @@ export default function PmoaOrgPage() {
         });
       }
     }
+    // Split assignments → dotted edges between paired positions
     for (const a of assignments) {
       if (a.kind === 'split' && Array.isArray(a.splitAllocations)) {
         const allocs = a.splitAllocations as Array<{ positionName?: string; pct?: number }>;
@@ -340,20 +464,23 @@ export default function PmoaOrgPage() {
           <h1 className="font-display text-lg font-semibold text-text-primary">Org map</h1>
           <p className="text-[11px] text-text-muted">
             {positions.length === 0
-              ? 'No positions yet — add manually or run "Build org from documents".'
+              ? 'No positions yet — run "Build org from documents" once you\'ve tagged HRIS rosters / org charts.'
               : `${positions.length} positions · ${departments.length} departments · ${assignments.length} assignments`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search positions…"
-            className="w-44 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-xs outline-none focus:border-brand-gold" />
-          <button onClick={() => openAddDepartment()}
-            className="rounded-md border border-border-default bg-white px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-surface-page">
-            + Department
-          </button>
-          <button onClick={() => openAddPosition()}
-            className="rounded-md border border-brand-gold bg-amber-50 px-3 py-1.5 text-xs font-medium text-brand-gold hover:bg-amber-100">
-            + Position
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search positions…"
+            className="w-48 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-xs outline-none focus:border-brand-gold"
+          />
+          <button
+            onClick={() => setShowWebIntel(true)}
+            className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px] text-text-primary hover:bg-surface-page"
+            title="Fetch leadership, investor relations, and news from the company website"
+          >
+            ⊕ Fetch web intel
           </button>
           <ExportMenu
             canvasRef={canvasRef}
@@ -377,10 +504,41 @@ export default function PmoaOrgPage() {
             initialPageFormat="A3"
             initialOrientation="landscape"
           />
-          <button onClick={buildOrg} disabled={building}
-            className="rounded-md bg-brand-gold px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
-            {building ? 'Building…' : '↻ Build from documents'}
+          <button
+            onClick={buildOrg}
+            disabled={building}
+            className="rounded-md bg-brand-gold px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {building ? 'Building…' : positions.length === 0 ? '↻ Build org from documents' : '↻ Re-build from documents'}
           </button>
+          {positions.length > 0 && (
+            confirmClear ? (
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-danger">Clear all org data?</span>
+                <button
+                  onClick={clearOrg}
+                  disabled={clearing}
+                  className="rounded border border-danger px-2 py-1 text-[11px] text-danger hover:bg-danger-bg disabled:opacity-50"
+                >
+                  {clearing ? '…' : 'Yes, clear'}
+                </button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  className="rounded border border-border-default px-2 py-1 text-[11px] text-text-muted hover:bg-surface-page"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmClear(true)}
+                className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px] text-text-muted hover:border-danger hover:text-danger"
+                title="Remove all org structure data for this project"
+              >
+                ✕ Clear data
+              </button>
+            )
+          )}
           <Link href="/pmoa" className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px] text-text-primary">
             ← PMOA
           </Link>
@@ -388,7 +546,9 @@ export default function PmoaOrgPage() {
       </div>
 
       {buildErr && (
-        <div className="mx-6 mt-3 rounded border border-danger bg-danger-bg px-3 py-2 text-[11px] text-danger">{buildErr}</div>
+        <div className="mx-6 mt-3 rounded border border-danger bg-danger-bg px-3 py-2 text-[11px] text-danger">
+          {buildErr}
+        </div>
       )}
       {globalClarifications.length > 0 && (
         <div className="mx-6 mt-3 rounded border border-warning bg-warning-bg px-3 py-2 text-[11px] text-warning">
@@ -410,34 +570,53 @@ export default function PmoaOrgPage() {
                 <div className="mb-3 text-3xl opacity-30">⌬</div>
                 <div className="font-display text-lg text-text-primary">No org graph yet</div>
                 <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
-                  Add positions manually with <strong>+ Position</strong>, or upload HR documents on the{' '}
-                  <Link href="/pmoa" className="text-brand-gold underline">PMOA dashboard</Link> and click <strong>Build from documents</strong>.
+                  Upload HR documents on the{' '}
+                  <Link href="/pmoa" className="text-brand-gold underline">PMOA dashboard</Link>,
+                  tag them as &quot;recent&quot; or &quot;partially valid&quot;, then click{' '}
+                  <strong>Build org from documents</strong>.
+                  Claude extracts departments, positions, reporting lines, and acting/split assignments.
                 </p>
-                <button onClick={() => openAddPosition()}
-                  className="mt-5 rounded-md bg-brand-gold px-4 py-2 text-xs font-medium text-white">
-                  + Add first position
-                </button>
+                <p className="mt-3 text-[11px] text-text-muted">
+                  Tip: click{' '}
+                  <button
+                    onClick={() => setShowWebIntel(true)}
+                    className="text-brand-gold underline"
+                  >
+                    Fetch web intel
+                  </button>{' '}
+                  to auto-scrape leadership and news from the company website.
+                </p>
               </div>
             </div>
           ) : (
-            <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick}
-              fitView fitViewOptions={{ padding: 0.2 }}
-              minZoom={0.1} maxZoom={2}
-              proOptions={{ hideAttribution: true }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodeClick={onNodeClick}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.2}
+              maxZoom={2}
+              proOptions={{ hideAttribution: true }}
+            >
               <Background color="#E5DBC8" gap={24} />
               <Controls position="bottom-right" />
-              <MiniMap position="top-right" pannable zoomable
+              <MiniMap
+                position="top-right"
+                pannable
+                zoomable
                 nodeColor={(n) => {
                   const p = positions.find((x) => x.id === n.id);
                   if (!p) return '#ddd';
                   if (p.vacancy) return '#FCD34D';
                   return '#8A7560';
-                }} />
+                }}
+              />
             </ReactFlow>
           )}
         </div>
 
-        {/* Side panel — position detail + edit */}
+        {/* Position detail side panel */}
         {selected && (
           <aside className="w-[340px] shrink-0 overflow-y-auto border-l border-border-default bg-white p-4">
             <div className="flex items-start justify-between">
@@ -448,39 +627,24 @@ export default function PmoaOrgPage() {
                   <div className="text-[11px] text-text-muted">#{selected.positionNumber}</div>
                 )}
               </div>
-              <button onClick={() => setSelectedId(null)} className="text-lg leading-none text-text-muted">×</button>
+              <button onClick={() => setSelectedId(null)} className="text-base text-text-muted">×</button>
             </div>
-
             <div className="mt-3 space-y-2 text-[12px]">
               <Row label="Department" value={selectedDept?.name || '—'} />
-              <Row label="Holder" value={selected.vacancy ? <em className="text-warning">vacant</em> : (selected.currentHolderName || '—')} />
-              <Row label="Reports to" value={selected.reportsToId ? (positions.find((p) => p.id === selected.reportsToId)?.name || '—') : '—'} />
+              <Row
+                label="Holder"
+                value={selected.vacancy
+                  ? <em className="text-warning">vacant</em>
+                  : (selected.currentHolderName || '—')}
+              />
               <Row label="Span of control" value={String(selected.spanOfControl)} />
-              <Row label="Linked JD" value={selected.linkedJdId
-                ? <Link href={`/jd/${selected.linkedJdId}`} className="text-brand-gold underline">open →</Link>
-                : <em className="text-text-muted">none</em>} />
+              <Row
+                label="Linked JD"
+                value={selected.linkedJdId
+                  ? <Link href={`/jd/${selected.linkedJdId}`} className="text-brand-gold underline">open →</Link>
+                  : <em className="text-text-muted">none</em>}
+              />
             </div>
-
-            {/* Action buttons */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={() => openEditPosition(selected)}
-                className="flex-1 rounded border border-border-default bg-surface-page px-3 py-1.5 text-[11px] font-medium text-text-primary hover:bg-gray-100">
-                Edit
-              </button>
-              <button
-                onClick={() => openAddPosition(selected.id)}
-                className="flex-1 rounded border border-brand-gold bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-brand-gold hover:bg-amber-100">
-                + Direct report
-              </button>
-              <button
-                onClick={() => deletePosition(selected.id)}
-                disabled={deleting}
-                className="w-full rounded border border-danger bg-danger-bg px-3 py-1.5 text-[11px] font-medium text-danger hover:opacity-80 disabled:opacity-40">
-                {deleting ? 'Deleting…' : 'Delete position'}
-              </button>
-            </div>
-
             {selectedAssignments.length > 0 && (
               <div className="mt-4">
                 <div className="mb-1 text-[10px] uppercase tracking-wider text-text-muted">Assignments</div>
@@ -498,13 +662,12 @@ export default function PmoaOrgPage() {
                 </ul>
               </div>
             )}
-
             {selected.sourceDocumentIds.length > 0 && (
               <div className="mt-4">
-                <div className="mb-1 text-[10px] uppercase tracking-wider text-text-muted">Source</div>
+                <div className="mb-1 text-[10px] uppercase tracking-wider text-text-muted">Source documents</div>
                 <ul className="space-y-1 text-[11px] text-text-muted">
                   {selected.sourceDocumentIds.map((id) => (
-                    <li key={id} className="font-mono truncate">{id}</li>
+                    <li key={id} className="font-mono">{id.slice(0, 8)}…</li>
                   ))}
                 </ul>
               </div>
@@ -513,181 +676,13 @@ export default function PmoaOrgPage() {
         )}
       </div>
 
-      {/* ── Modal ─────────────────────────────────────────────────────────── */}
-      {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) setModalMode(null); }}>
-          <div className="w-full max-w-md rounded-xl border border-border-default bg-white p-6 shadow-xl">
-            {(modalMode === 'add-position' || modalMode === 'edit-position') && (
-              <PositionModal
-                mode={modalMode}
-                form={positionForm}
-                onChange={setPositionForm}
-                positions={positions.filter((p) => p.id !== selectedId)}
-                departments={departments}
-                saving={saving}
-                error={saveErr}
-                onSave={savePosition}
-                onClose={() => setModalMode(null)}
-              />
-            )}
-            {modalMode === 'add-department' && (
-              <DeptModal
-                name={deptName}
-                parentId={deptParentId}
-                departments={departments}
-                saving={saving}
-                error={saveErr}
-                onName={setDeptName}
-                onParent={setDeptParentId}
-                onSave={saveDepartment}
-                onClose={() => setModalMode(null)}
-              />
-            )}
-          </div>
-        </div>
+      {/* Web Intel Modal */}
+      {showWebIntel && (
+        <WebIntelModal
+          onClose={() => setShowWebIntel(false)}
+          onSaved={() => {/* docs saved — user can now rebuild */}}
+        />
       )}
-    </div>
-  );
-}
-
-// ── Position Modal ────────────────────────────────────────────────────────────
-function PositionModal({
-  mode, form, onChange, positions, departments, saving, error, onSave, onClose,
-}: {
-  mode: 'add-position' | 'edit-position';
-  form: PositionForm;
-  onChange: (f: PositionForm) => void;
-  positions: PositionDTO[];
-  departments: DepartmentDTO[];
-  saving: boolean;
-  error: string | null;
-  onSave: () => void;
-  onClose: () => void;
-}) {
-  const set = (k: keyof PositionForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    onChange({ ...form, [k]: e.target.value });
-
-  return (
-    <>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-base font-semibold text-text-primary">
-          {mode === 'add-position' ? 'Add position' : 'Edit position'}
-        </h2>
-        <button onClick={onClose} className="text-lg leading-none text-text-muted">×</button>
-      </div>
-
-      <div className="space-y-3">
-        <FormField label="Position title *">
-          <input autoFocus value={form.name} onChange={set('name')} placeholder="e.g. Head of Finance"
-            className="field" />
-        </FormField>
-
-        <FormField label="Position number">
-          <input value={form.positionNumber} onChange={set('positionNumber')} placeholder="e.g. FIN-001"
-            className="field" />
-        </FormField>
-
-        <FormField label="Department">
-          <select value={form.departmentId} onChange={set('departmentId')} className="field">
-            <option value="">— none —</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </FormField>
-
-        <FormField label="Reports to">
-          <select value={form.reportsToId} onChange={set('reportsToId')} className="field">
-            <option value="">— top level —</option>
-            {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </FormField>
-
-        <FormField label="Current holder name">
-          <input value={form.currentHolderName} onChange={set('currentHolderName')} placeholder="e.g. Anna Kowalska"
-            className="field" />
-        </FormField>
-
-        <label className="flex items-center gap-2 text-[12px] text-text-primary cursor-pointer">
-          <input type="checkbox" checked={form.vacancy} onChange={(e) => onChange({ ...form, vacancy: e.target.checked })}
-            className="rounded border-border-default" />
-          Mark as vacant
-        </label>
-      </div>
-
-      {error && <p className="mt-3 text-[11px] text-danger">{error}</p>}
-
-      <div className="mt-5 flex justify-end gap-2">
-        <button onClick={onClose} className="rounded border border-border-default px-4 py-2 text-[12px] text-text-primary">
-          Cancel
-        </button>
-        <button onClick={onSave} disabled={saving}
-          className="rounded bg-brand-gold px-4 py-2 text-[12px] font-medium text-white disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save position'}
-        </button>
-      </div>
-
-      <style>{`.field { width: 100%; border-radius: 6px; border: 1px solid #D6C9B8; padding: 6px 10px; font-size: 12px; outline: none; } .field:focus { border-color: #8A7560; }`}</style>
-    </>
-  );
-}
-
-// ── Department Modal ──────────────────────────────────────────────────────────
-function DeptModal({
-  name, parentId, departments, saving, error, onName, onParent, onSave, onClose,
-}: {
-  name: string;
-  parentId: string;
-  departments: DepartmentDTO[];
-  saving: boolean;
-  error: string | null;
-  onName: (v: string) => void;
-  onParent: (v: string) => void;
-  onSave: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-base font-semibold text-text-primary">Add department</h2>
-        <button onClick={onClose} className="text-lg leading-none text-text-muted">×</button>
-      </div>
-
-      <div className="space-y-3">
-        <FormField label="Department name *">
-          <input autoFocus value={name} onChange={(e) => onName(e.target.value)} placeholder="e.g. Finance"
-            className="field" />
-        </FormField>
-
-        <FormField label="Parent department">
-          <select value={parentId} onChange={(e) => onParent(e.target.value)} className="field">
-            <option value="">— top level —</option>
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </FormField>
-      </div>
-
-      {error && <p className="mt-3 text-[11px] text-danger">{error}</p>}
-
-      <div className="mt-5 flex justify-end gap-2">
-        <button onClick={onClose} className="rounded border border-border-default px-4 py-2 text-[12px] text-text-primary">
-          Cancel
-        </button>
-        <button onClick={onSave} disabled={saving}
-          className="rounded bg-brand-gold px-4 py-2 text-[12px] font-medium text-white disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save department'}
-        </button>
-      </div>
-
-      <style>{`.field { width: 100%; border-radius: 6px; border: 1px solid #D6C9B8; padding: 6px 10px; font-size: 12px; outline: none; } .field:focus { border-color: #8A7560; }`}</style>
-    </>
-  );
-}
-
-// ── Shared helpers ────────────────────────────────────────────────────────────
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-text-muted">{label}</label>
-      {children}
     </div>
   );
 }
@@ -705,7 +700,11 @@ function NodeBox({ p, acting, split, dimmed }: {
       <div className="mt-1 text-[10px] text-text-muted">
         {p.vacancy ? <em className="text-warning">vacant</em> : (p.currentHolderName || '—')}
       </div>
-      {acting && <div className="mt-0.5 text-[9px] text-warning">⚠ acting: {acting}</div>}
+      {acting && (
+        <div className="mt-0.5 text-[9px] text-warning">
+          ⚠ acting: {acting}
+        </div>
+      )}
       {split && <div className="mt-0.5 text-[9px] text-[#C0350A]">↔ split</div>}
       {p.spanOfControl > 0 && (
         <div className="absolute right-1 top-1 rounded bg-text-primary px-1 text-[9px] text-white">

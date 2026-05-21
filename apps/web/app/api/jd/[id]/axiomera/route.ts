@@ -76,10 +76,20 @@ export async function POST(
   if (!jd) {
     return NextResponse.json({ error: 'JD not found' }, { status: 404 });
   }
-  if (jd.text.trim().length < 80) {
+  const jdTextLength = jd.text.trim().length;
+  if (jdTextLength < 80) {
     return NextResponse.json(
       { error: 'JD content too short for Axiomera evaluation', minChars: 80 },
       { status: 400 },
+    );
+  }
+  // SEC-10: prevent extremely large JDs from exhausting context window or incurring runaway costs.
+  // ~50 000 chars ≈ 12 500 tokens — well within model limits but a reasonable safety cap.
+  const MAX_JD_CHARS = 50_000;
+  if (jdTextLength > MAX_JD_CHARS) {
+    return NextResponse.json(
+      { error: 'JD content too long for Axiomera evaluation', maxChars: MAX_JD_CHARS },
+      { status: 413 },
     );
   }
 

@@ -55,6 +55,10 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Phase 3 - user preferences
+  preferredLanguage String? @map("preferred_language") // ISO-639-1 code, e.g. "pl" - synced from settings on save
+
+
   memberships      Membership[]
   ownedJDs         JobDescription[] @relation("JDOwner")
   jdVersions       JDVersion[]
@@ -307,6 +311,9 @@ model JobDescription {
   axiomeraRuns AxiomeraRun[]
   jdqRuns      JdqRun[]
   aiUsageLogs  AiUsageLog[]
+
+  // Sources Intelligence Engine
+  importedPostings ImportedJobPosting[]
 
   @@index([orgId])
   @@index([ownerId])
@@ -1118,4 +1125,235 @@ model ReadinessScore {
   @@index([orgId, createdAt])
   @@index([jdId])
   @@map("readiness_scores")
+}
+
+// ── Sources Intelligence Engine ───────────────────────────────────────────────
+
+// One row per configured source (Greenhouse board, Ashby org, Adzuna search, etc.)
+model SourceConnection {
+  id               String   @id @default(uuid())
+  orgId            String
+  sourceName       String   // human label e.g. "Acme Greenhouse Board"
+  sourceKind       String   // GREENHOUSE_API | ASHBY_POSTING_API | ADZUNA_API | SCHEMA_ORG | GENERIC_HTML | MANUAL_URL | ...
+  config           Json     @default("{}") // { boardToken, country, query, connectorId, ... }
+  status           String   @default("ACTIVE") // ACTIVE | PAUSED | ERROR
+  permissionStatus String   @default("UNKNOWN") // UNKNOWN | ROBOTS_OK | BLOCKED | API_OK
+  lastRunAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  runs     SourceRun[]
+  postings ImportedJobPosting[]
+
+  @@index([orgId, status])
+  @@map("source_connections")
+}
+
+// One row per ingestion run triggered for a SourceConnection
+model SourceRun {
+  id                 String   @id @default(uuid())
+  sourceConnectionId String
+  orgId              String
+  status             String   @default("running") // running | completed | failed | partial
+  startedAt          DateTime @default(now())
+  finishedAt         DateTime?
+  jobsDiscovered     Int      @default(0)
+  jobsFetched        Int      @default(0)
+  jobsImported       Int      @default(0)
+  jobsFailed         Int      @default(0)
+  diagnosticsJson    Json?
+
+  sourceConnection SourceConnection     @relation(fields: [sourceConnectionId], references: [id], onDelete: Cascade)
+  postings         ImportedJobPosting[]
+  snapshots        RawSourceSnapshot[]
+
+  @@index([sourceConnectionId, startedAt])
+  @@index([orgId, startedAt])
+  @@map("source_runs")
+}
+
+// Normalised job posting imported from any source (pre-approval, not yet in JD Hub)
+model ImportedJobPosting {
+  id                 String   @id @default(uuid())
+  orgId              String
+  sourceConnectionId String?
+  sourceRunId        String?
+  externalId         String?  // ID from the source ATS/board
+  canonicalUrl       String?
+  sourceUrl          String?
+  companyName        String?
+  title              String
+  normalizedTitle    String?
+  department         String?
+  team               String?
+  jobFamily          String?
+  jobLevel           String?
+  location           String?
+  country            String?
+  workingModel       String?  // Remote | Hybrid | On-site
+  employmentType     String?
+  salaryMin          Decimal? @db.Decimal(12, 2)
+  salaryMax          Decimal? @db.Decimal(12, 2)
+  salaryCurrency     String?
+  salaryPeriod       String?  // YEAR | MONTH | HOUR
+  datePosted         DateTime?
+  dateFirstSeen      DateTime @default(now())
+  descriptionRaw     String?  @db.Text
+  descriptionClean   String?  @db.Text
+  contentHash        String?  // SHA-256 of url+title+description for dedup
+  sourceKind         String?
+  confidenceScore    Int?
+  diagnosticsJson    Json?
+  linkedJdId         String?  // set when user saves posting to JD Hub
+  reviewStatus       String   @default("PENDING") // PENDING | APPROVED | REJECTED | SAVED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  sourceConnection   SourceConnection?       @relation(fields: [sourceConnectionId], references: [id], onDelete: SetNull)
+  sourceRun          SourceRun?              @relation(fields: [sourceRunId], references: [id], onDelete: SetNull)
+  linkedJd           JobDescription?         @relation(fields: [linkedJdId], references: [id], onDelete: SetNull)
+  readinessRecord    JDEvaluationReadinessRecord?
+  extraContextItems  ExtraContextItem[]
+
+  @@unique([orgId, contentHash])  // prevents duplicate imports
+  @@index([orgId, reviewStatus, createdAt])
+  @@index([orgId, sourceKind])
+  @@index([sourceConnectionId])
+  @@map("imported_job_postings")
+}
+
+// JD Evaluation Readiness assessment (Claude-powered) per imported posting
+model JDEvaluationReadinessRecord {
+  id                          String   @id @default(uuid())
+  importedJobPostingId        String   @unique
+  orgId                       String
+  rolePurposeJson             Json?
+  topResponsibilitiesJson     Json?
+  decisionRightsJson          Json?
+  scopeOfImpactJson           Json?
+  reportingRelationshipsJson  Json?
+  criticalRequirementsJson    Json?
+  skillsEvidenceJson          Json?
+  missingEvidenceJson         Json?
+  ambiguityFlagsJson          Json?
+  recruitmentCopyWarning      Boolean  @default(false)
+  evaluationReadinessScore    Int?     // 0-100
+  confidenceScore             Int?
+  recommendedQuestionsJson    Json?
+  recommendedImprovementsJson Json?
+  createdAt                   DateTime @default(now())
+
+  posting ImportedJobPosting @relation(fields: [importedJobPostingId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, evaluationReadinessScore])
+  @@map("jd_evaluation_readiness_records")
+}
+
+// Raw HTML/JSON snapshot of each fetched URL (for audit trail + re-parsing)
+model RawSourceSnapshot {
+  id            String   @id @default(uuid())
+  orgId         String
+  sourceRunId   String?
+  url           String
+  externalId    String?
+  contentHash   String?
+  rawHtml       String?  @db.Text
+  rawJson       Json?
+  fetchedAt     DateTime @default(now())
+  headersJson   Json?
+  parserVersion String   @default("1.0")
+
+  sourceRun SourceRun? @relation(fields: [sourceRunId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, fetchedAt])
+  @@index([sourceRunId])
+  @@index([contentHash])
+  @@map("raw_source_snapshots")
+}
+
+// Org structure inference run — one per discover run
+model OrgInferenceRun {
+  id                    String   @id @default(uuid())
+  orgId                 String
+  sourceRunId           String?
+  status                String   @default("COMPLETE") // RUNNING | COMPLETE | FAILED
+  createdAt             DateTime @default(now())
+  disclaimer            String   @db.Text
+  graphJson             Json?    // full OrgInferenceResult JSON
+  confidenceSummary     Json?    // { avgNodeConfidence, departments, teams, roles }
+  unresolvedSignalsJson Json?
+  conflictsJson         Json?
+
+  nodes OrgNode[]
+  edges OrgEdge[]
+
+  @@index([orgId, createdAt])
+  @@map("org_inference_runs")
+}
+
+// Org graph node (department, team, role, location, etc.)
+model OrgNode {
+  id              String   @id @default(uuid())
+  orgInferenceRunId String
+  type            String   // company | department | subDepartment | team | jobFamily | role | location
+  label           String
+  normalizedLabel String
+  confidence      Int      // 0-100
+  evidenceJson    Json     // string[]
+  sourceUrlsJson  Json     // string[]
+  jobCount        Int      @default(1)
+  createdAt       DateTime @default(now())
+
+  run        OrgInferenceRun @relation(fields: [orgInferenceRunId], references: [id], onDelete: Cascade)
+  fromEdges  OrgEdge[]       @relation("EdgeFrom")
+  toEdges    OrgEdge[]       @relation("EdgeTo")
+
+  @@index([orgInferenceRunId, type])
+  @@index([normalizedLabel])
+  @@map("org_nodes")
+}
+
+// Org graph edge (contains, reports_to, co_located, peer)
+model OrgEdge {
+  id                String   @id @default(uuid())
+  orgInferenceRunId String
+  fromNodeId        String
+  toNodeId          String
+  relationshipType  String   // contains | reports_to | co_located | peer
+  confidence        Int      // 0-100
+  evidenceJson      Json     // string[]
+  createdAt         DateTime @default(now())
+
+  run      OrgInferenceRun @relation(fields: [orgInferenceRunId], references: [id], onDelete: Cascade)
+  fromNode OrgNode         @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   OrgNode         @relation("EdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@index([orgInferenceRunId])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+  @@map("org_edges")
+}
+
+// Extra context item attached to an imported posting (annual reports, press, news)
+model ExtraContextItem {
+  id                      String   @id @default(uuid())
+  orgId                   String
+  importedJobPostingId    String?
+  sourceType              String   // website | ir | news | annual_report | press_release | blog | upload
+  title                   String
+  url                     String?
+  publishedAt             DateTime?
+  summary                 String   @db.Text
+  relevanceToJd           String?  @db.Text
+  reliabilityScore        Int?     // 0-100
+  riskLevel               String   @default("LOW") // LOW | MEDIUM | HIGH
+  recommendation          String   @default("KEEP_AS_CONTEXT") // INCLUDE | KEEP_AS_CONTEXT | IGNORE
+  userDecision            String?  // APPROVED | REJECTED | PENDING
+  createdAt               DateTime @default(now())
+
+  posting ImportedJobPosting? @relation(fields: [importedJobPostingId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, importedJobPostingId])
+  @@index([orgId, createdAt])
+  @@map("extra_context_items")
 }
