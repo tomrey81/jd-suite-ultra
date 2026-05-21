@@ -3,6 +3,7 @@ import { db } from '@jd-suite/db';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { TemplatesList } from '@/components/templates/templates-list';
+import { ImportTemplateButton } from '@/components/templates/import-template-button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'JD Templates — JD Suite' };
@@ -43,12 +44,15 @@ export default async function TemplatesPage() {
               Templates drive what the AI Editor and Lint &amp; Analyse expect from a JD.
             </p>
           </div>
-          <Link
-            href="/templates/new"
-            className="rounded-full bg-brand-gold px-4 py-2 text-xs font-medium tracking-wide text-white transition-colors hover:bg-brand-gold/90"
-          >
-            + New Template
-          </Link>
+          <div className="flex items-center gap-2">
+            <ImportTemplateButton />
+            <Link
+              href="/templates/new"
+              className="rounded-full bg-brand-gold px-4 py-2 text-xs font-medium tracking-wide text-white transition-colors hover:bg-brand-gold/90"
+            >
+              + New Template
+            </Link>
+          </div>
         </div>
 
         <TemplatesList templates={templates as any} orgId={orgId ?? null} />
