@@ -18,10 +18,11 @@ async function extractText(buffer: Buffer, ext: string): Promise<string> {
   }
 
   if (ext === 'pdf') {
-    const mod: any = await import('pdf-parse');
-    const pdfParse = mod.default ?? mod;
-    const result = await pdfParse(buffer);
-    return result.text as string;
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    await parser.destroy();
+    return (result.text as string) ?? '';
   }
 
   if (ext === 'docx') {
