@@ -57,6 +57,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<string> {
     // works for uncompressed or lightly-compressed XML runs (not perfect but
     // sufficient for template structure recognition).
     try {
+      // @ts-ignore – jszip is an optional peer; fallback below handles missing case
       const JSZip = (await import('jszip')).default;
       const zip = await JSZip.loadAsync(buffer);
       const slideFiles = Object.keys(zip.files).filter(
