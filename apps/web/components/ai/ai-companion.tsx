@@ -363,8 +363,15 @@ export function AICompanion() {
   const [errorState, setErrorState] = useState<{ message: string; code: string } | null>(null);
   const [mood, setMood] = useState<Mood>('idle');
 
-  // Resizable panel
-  const [panelSize, setPanelSize] = useState<{ w: number; h: number }>({ w: 420, h: 580 });
+  // Resizable panel — size persisted to localStorage
+  const [panelSize, setPanelSize] = useState<{ w: number; h: number }>(() => {
+    if (typeof window === 'undefined') return { w: 420, h: 580 };
+    try {
+      const raw = localStorage.getItem('jdgc_panel_px');
+      if (raw) { const p = JSON.parse(raw); if (p?.w && p?.h) return p; }
+    } catch { /* ignore */ }
+    return { w: 420, h: 580 };
+  });
   const resizing = useRef(false);
   const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
 
@@ -656,6 +663,7 @@ export function AICompanion() {
   const onResizePointerUp = () => {
     resizing.current = false;
     resizeStart.current = null;
+    try { localStorage.setItem('jdgc_panel_px', JSON.stringify(panelSize)); } catch { /* ignore */ }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
