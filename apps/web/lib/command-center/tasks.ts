@@ -57,7 +57,7 @@ export const TASK_KIND_META: Record<TaskKind, { label: string; icon: string; col
 interface JDInput {
   id: string;
   jobTitle: string;
-  status: 'DRAFT' | 'UNDER_REVISION' | 'APPROVED' | 'ARCHIVED' | 'PUBLISHED';
+  status: 'DRAFT' | 'UNDER_REVISION' | 'APPROVED' | 'ARCHIVED' | 'PUBLISHED' | 'REJECTED';
   updatedAt: Date | string;
   hasSlot: boolean;
   hasEval: boolean;
