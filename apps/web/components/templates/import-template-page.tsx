@@ -3,66 +3,113 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface IloMissing { criterion: string; suggestedSection: string; suggestedField: string; }
-interface EigeMissing { indicator: string; suggestedSection: string; suggestedField: string; }
-interface Recommendation { section: string; fieldLabel: string; fieldType: string; rationale: string; }
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface IloMissing {
+  criterion: string;
+  suggestedSection: string;
+  suggestedField: string;
+}
+
+interface EigeMissing {
+  indicator: string;
+  suggestedSection: string;
+  suggestedField: string;
+}
+
+interface Recommendation {
+  section: string;
+  fieldLabel: string;
+  fieldType: string;
+  rationale: string;
+}
+
 interface Assessment {
   ilo: { covered: string[]; missing: IloMissing[]; coveragePercent: number };
   eige: { covered: string[]; missing: EigeMissing[]; coveragePercent: number };
   recommendations: Recommendation[];
   overallNote: string;
 }
+
 interface ImportResult {
   templateName: string;
   templatePurpose: string;
   templateDescription: string;
-  sections: any[];
+  sections: Section[];
   assessment: Assessment;
 }
 
-type Step = 'upload' | 'analysing' | 'review' | 'saving' | 'done';
+interface Section {
+  id: string;
+  title: string;
+  desc?: string;
+  fields?: unknown[];
+}
+
+// UI is either on the upload form or the review panel. Loading states are
+// tracked separately so TypeScript does not narrow us into a corner.
+type Step = 'upload' | 'review' | 'done';
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export function ImportTemplatePage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+
   const [step, setStep] = useState<Step>('upload');
+  const [isLoading, setIsLoading] = useState(false);
+
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+
   const [result, setResult] = useState<ImportResult | null>(null);
   const [templateName, setTemplateName] = useState('');
   const [includeRecommendations, setIncludeRecommendations] = useState(false);
 
+  // -------------------------------------------------------------------------
+  // Handlers
+  // -------------------------------------------------------------------------
+
   const analyse = async () => {
-    if (!file) return;
+    if (!file || isLoading) return;
     setError(null);
-    setStep('analysing');
+    setIsLoading(true);
+
     const form = new FormData();
     form.append('file', file);
-    form.append('name', name || file.name.replace(/\.[^.]+$/, ''));
+    form.append('name', name.trim() || file.name.replace(/\.[^.]+$/, ''));
+
     try {
       const res = await fetch('/api/templates/import-from-file', { method: 'POST', body: form });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Analysis failed (${res.status})`);
+        const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error(typeof err.error === 'string' ? err.error : `Analysis failed (${res.status})`);
       }
-      const data: ImportResult = await res.json();
+      const data = await res.json() as ImportResult;
       setResult(data);
-      setTemplateName(data.templateName || name || 'Imported Template');
+      setTemplateName(data.templateName || name.trim() || 'Imported Template');
       setStep('review');
-    } catch (err: any) {
-      setError(err.message);
-      setStep('upload');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const save = async () => {
-    if (!result) return;
+    if (!result || isLoading) return;
     setError(null);
-    setStep('saving');
+    setIsLoading(true);
+
     let sections = result.sections;
+
     if (includeRecommendations && result.assessment.recommendations.length > 0) {
-      const recFields = result.assessment.recommendations.map((r, i) => ({
+      const complianceFields = result.assessment.recommendations.map((r, i) => ({
         id: `rec-field-${i}`,
         label: r.fieldLabel,
         type: r.fieldType || 'textarea',
@@ -72,17 +119,18 @@ export function ImportTemplatePage() {
         ai: true,
         priority: 'should-have',
       }));
+
       sections = [
         ...sections,
         {
           id: 'compliance-additions',
           title: 'Compliance Additions (ILO / EIGE)',
           desc: 'Fields recommended to improve pay equity and gender equality compliance.',
-          required: false,
-          fields: recFields,
+          fields: complianceFields,
         },
       ];
     }
+
     try {
       const res = await fetch('/api/templates', {
         method: 'POST',
@@ -95,20 +143,34 @@ export function ImportTemplatePage() {
           isDefault: false,
         }),
       });
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Save failed (${res.status})`);
+        const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error(typeof err.error === 'string' ? err.error : `Save failed (${res.status})`);
       }
-      const saved = await res.json();
+
+      const saved = await res.json() as { id: string };
       setStep('done');
       setTimeout(() => router.push(`/templates/${saved.id}`), 1000);
-    } catch (err: any) {
-      setError(err.message);
-      setStep('review');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const coverageBar = (pct: number) => (
+  const reset = () => {
+    setStep('upload');
+    setResult(null);
+    setError(null);
+    setIsLoading(false);
+  };
+
+  // -------------------------------------------------------------------------
+  // Sub-renders
+  // -------------------------------------------------------------------------
+
+  const CoverageBar = ({ pct }: { pct: number }) => (
     <div className="h-2 w-full rounded-full bg-surface-page">
       <div
         className="h-2 rounded-full transition-all"
@@ -120,6 +182,10 @@ export function ImportTemplatePage() {
     </div>
   );
 
+  // -------------------------------------------------------------------------
+  // Render: done
+  // -------------------------------------------------------------------------
+
   if (step === 'done') {
     return (
       <div className="rounded-2xl border border-border-default bg-white p-16 text-center">
@@ -129,6 +195,10 @@ export function ImportTemplatePage() {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Render: main
+  // -------------------------------------------------------------------------
+
   return (
     <div className="space-y-5">
       {error && (
@@ -137,8 +207,8 @@ export function ImportTemplatePage() {
         </div>
       )}
 
-      {/* STEP: upload */}
-      {(step === 'upload' || step === 'analysing') && (
+      {/* Upload form */}
+      {step === 'upload' && (
         <div className="rounded-2xl border border-border-default bg-white p-8 space-y-6">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-text-secondary">
@@ -175,14 +245,14 @@ export function ImportTemplatePage() {
                 <div>
                   <div className="text-base font-medium text-text-primary">{file.name}</div>
                   <div className="mt-1 text-xs text-text-muted">
-                    {(file.size / 1024).toFixed(0)} KB — click to change
+                    {(file.size / 1024).toFixed(0)} KB - click to change
                   </div>
                 </div>
               ) : (
                 <div>
                   <div className="text-sm text-text-muted">Click to select file</div>
                   <div className="mt-1 text-xs text-text-muted">
-                    .docx, .pdf, .xlsx, .pptx, .txt — max 2 MB
+                    .docx, .pdf, .xlsx, .pptx, .txt - max 2 MB
                   </div>
                 </div>
               )}
@@ -199,15 +269,15 @@ export function ImportTemplatePage() {
 
           <button
             onClick={analyse}
-            disabled={!file || step === 'analysing'}
+            disabled={!file || isLoading}
             className="w-full rounded-full bg-brand-gold py-3 text-sm font-medium text-white disabled:opacity-50 hover:bg-brand-gold/90"
           >
-            {step === 'analysing' ? 'Analysing — this takes 20-40 seconds...' : 'Analyse Template'}
+            {isLoading ? 'Analysing - this takes 20-40 seconds...' : 'Analyse Template'}
           </button>
         </div>
       )}
 
-      {/* STEP: review */}
+      {/* Review panel */}
       {step === 'review' && result && (
         <>
           {/* Template name */}
@@ -226,13 +296,13 @@ export function ImportTemplatePage() {
             )}
           </div>
 
-          {/* Structure */}
+          {/* Proposed structure */}
           <div className="rounded-2xl border border-border-default bg-white p-6">
             <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-muted">
-              Proposed Structure — {result.sections.length} sections
+              Proposed Structure - {result.sections.length} sections
             </div>
             <div className="divide-y divide-border-default">
-              {result.sections.map((s: any) => (
+              {result.sections.map((s) => (
                 <div key={s.id} className="flex items-center justify-between py-2.5">
                   <div>
                     <span className="text-sm font-medium text-text-primary">{s.title}</span>
@@ -241,14 +311,14 @@ export function ImportTemplatePage() {
                     )}
                   </div>
                   <span className="text-xs text-text-muted shrink-0 ml-4">
-                    {s.fields?.length ?? 0} fields
+                    {Array.isArray(s.fields) ? s.fields.length : 0} fields
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ILO */}
+          {/* ILO pay equity */}
           <div className="rounded-2xl border border-border-default bg-white p-6">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
@@ -257,20 +327,25 @@ export function ImportTemplatePage() {
               <span className="text-sm font-semibold text-text-primary">
                 {result.assessment.ilo.coveragePercent}%
                 <span className="ml-1 text-xs font-normal text-text-muted">
-                  ({result.assessment.ilo.covered.length}/{result.assessment.ilo.covered.length + result.assessment.ilo.missing.length} criteria)
+                  ({result.assessment.ilo.covered.length}/
+                  {result.assessment.ilo.covered.length + result.assessment.ilo.missing.length} criteria)
                 </span>
               </span>
             </div>
-            {coverageBar(result.assessment.ilo.coveragePercent)}
+            <CoverageBar pct={result.assessment.ilo.coveragePercent} />
             {result.assessment.ilo.missing.length > 0 && (
               <div className="mt-3 space-y-1.5">
-                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Missing criteria</div>
+                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">
+                  Missing criteria
+                </div>
                 {result.assessment.ilo.missing.map((m) => (
                   <div key={m.criterion} className="flex items-start gap-2 text-xs">
                     <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-danger shrink-0" />
                     <span>
                       <span className="font-medium text-text-primary">{m.criterion}</span>
-                      <span className="text-text-muted"> — add "{m.suggestedField}" to {m.suggestedSection}</span>
+                      <span className="text-text-muted">
+                        {' '}— add &ldquo;{m.suggestedField}&rdquo; to {m.suggestedSection}
+                      </span>
                     </span>
                   </div>
                 ))}
@@ -287,7 +362,7 @@ export function ImportTemplatePage() {
             )}
           </div>
 
-          {/* EIGE */}
+          {/* EIGE gender equality */}
           <div className="rounded-2xl border border-border-default bg-white p-6">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
@@ -297,16 +372,20 @@ export function ImportTemplatePage() {
                 {result.assessment.eige.coveragePercent}%
               </span>
             </div>
-            {coverageBar(result.assessment.eige.coveragePercent)}
+            <CoverageBar pct={result.assessment.eige.coveragePercent} />
             {result.assessment.eige.missing.length > 0 && (
               <div className="mt-3 space-y-1.5">
-                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Missing indicators</div>
+                <div className="text-[11px] font-medium text-text-muted uppercase tracking-wider">
+                  Missing indicators
+                </div>
                 {result.assessment.eige.missing.map((m) => (
                   <div key={m.indicator} className="flex items-start gap-2 text-xs">
                     <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-warning shrink-0" />
                     <span>
                       <span className="font-medium text-text-primary">{m.indicator}</span>
-                      <span className="text-text-muted"> — add "{m.suggestedField}" to {m.suggestedSection}</span>
+                      <span className="text-text-muted">
+                        {' '}— add &ldquo;{m.suggestedField}&rdquo; to {m.suggestedSection}
+                      </span>
                     </span>
                   </div>
                 ))}
@@ -314,15 +393,19 @@ export function ImportTemplatePage() {
             )}
           </div>
 
-          {/* Overall note */}
+          {/* Assessment summary */}
           {result.assessment.overallNote && (
             <div className="rounded-2xl border border-border-default bg-white p-6">
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-muted">Assessment summary</div>
-              <p className="text-sm text-text-secondary leading-relaxed">{result.assessment.overallNote}</p>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                Assessment summary
+              </div>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                {result.assessment.overallNote}
+              </p>
             </div>
           )}
 
-          {/* Recommendations */}
+          {/* Compliance recommendations */}
           {result.assessment.recommendations.length > 0 && (
             <div className="rounded-2xl border border-border-default bg-white p-6">
               <label className="flex cursor-pointer items-start gap-3">
@@ -337,7 +420,7 @@ export function ImportTemplatePage() {
                     Add {result.assessment.recommendations.length} recommended compliance fields
                   </div>
                   <div className="mt-0.5 text-xs text-text-muted">
-                    Appends a "Compliance Additions (ILO / EIGE)" section. You can edit or remove fields after saving.
+                    Appends a &ldquo;Compliance Additions (ILO / EIGE)&rdquo; section. You can edit or remove fields after saving.
                   </div>
                 </div>
               </label>
@@ -360,19 +443,21 @@ export function ImportTemplatePage() {
             </div>
           )}
 
+          {/* Actions */}
           <div className="flex gap-3">
             <button
-              onClick={() => { setStep('upload'); setResult(null); }}
-              className="flex-1 rounded-full border border-border-default py-3 text-sm text-text-secondary hover:border-brand-gold/50"
+              onClick={reset}
+              disabled={isLoading}
+              className="flex-1 rounded-full border border-border-default py-3 text-sm text-text-secondary hover:border-brand-gold/50 disabled:opacity-50"
             >
               Back
             </button>
             <button
               onClick={save}
-              disabled={!templateName.trim() || step === 'saving'}
+              disabled={!templateName.trim() || isLoading}
               className="flex-1 rounded-full bg-brand-gold py-3 text-sm font-medium text-white disabled:opacity-50 hover:bg-brand-gold/90"
             >
-              {step === 'saving' ? 'Saving...' : 'Save Template'}
+              {isLoading ? 'Saving...' : 'Save Template'}
             </button>
           </div>
         </>

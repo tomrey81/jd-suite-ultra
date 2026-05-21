@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/get-session';
-import { callClaude, JD_SYSTEM_PROMPT } from '@/lib/ai';
+import { callClaude } from '@/lib/ai';
 import {
   TEMPLATE_IMPORT_SYSTEM_PROMPT,
   buildTemplateImportPrompt,
@@ -10,79 +10,102 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
-const MAX_CHARS = 20000;
+const MAX_CHARS = 20_000;
 
-async function extractText(buffer: Buffer, ext: string): Promise<string> {
-  if (ext === 'txt') {
-    return buffer.toString('utf-8');
-  }
+const SUPPORTED_EXTENSIONS = ['txt', 'pdf', 'docx', 'xlsx', 'pptx'] as const;
+type SupportedExt = (typeof SUPPORTED_EXTENSIONS)[number];
 
-  if (ext === 'pdf') {
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    await parser.destroy();
-    return (result.text as string) ?? '';
-  }
+function isSupportedExt(ext: string): ext is SupportedExt {
+  return (SUPPORTED_EXTENSIONS as readonly string[]).includes(ext);
+}
 
-  if (ext === 'docx') {
-    const mod = await import('mammoth');
-    const mammoth: any = mod.default ?? mod;
-    const result = await mammoth.extractRawText({ buffer });
-    return result.value as string;
-  }
+// ---------------------------------------------------------------------------
+// Text extraction
+// ---------------------------------------------------------------------------
 
-  if (ext === 'xlsx') {
-    const ExcelJS = (await import('exceljs')).default;
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer as any);
-    const lines: string[] = [];
-    workbook.eachSheet((sheet) => {
-      lines.push(`[Sheet: ${sheet.name}]`);
-      sheet.eachRow((row) => {
-        const cells: string[] = [];
-        row.eachCell({ includeEmpty: false }, (cell) => {
-          const v = cell.text ?? String(cell.value ?? '');
-          if (v.trim()) cells.push(v.trim());
+async function extractText(buffer: Buffer, ext: SupportedExt): Promise<string> {
+  switch (ext) {
+    case 'txt': {
+      return buffer.toString('utf-8');
+    }
+
+    case 'pdf': {
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: buffer });
+      const result = await parser.getText();
+      await parser.destroy();
+      return (result.text as string) ?? '';
+    }
+
+    case 'docx': {
+      const mammoth = (await import('mammoth')).default;
+      const result = await mammoth.extractRawText({ buffer });
+      return result.value;
+    }
+
+    case 'xlsx': {
+      const ExcelJS = (await import('exceljs')).default;
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+      const lines: string[] = [];
+      workbook.eachSheet((sheet) => {
+        lines.push(`[Sheet: ${sheet.name}]`);
+        sheet.eachRow((row) => {
+          const cells: string[] = [];
+          row.eachCell({ includeEmpty: false }, (cell) => {
+            const v = cell.text || String(cell.value ?? '');
+            if (v.trim()) cells.push(v.trim());
+          });
+          if (cells.length) lines.push(cells.join('\t'));
         });
-        if (cells.length) lines.push(cells.join('\t'));
       });
-    });
-    return lines.join('\n');
-  }
+      return lines.join('\n');
+    }
 
-  if (ext === 'pptx') {
-    // PPTX is a ZIP archive. We use the jszip package when available.
-    // If jszip is not installed, fall back to a raw buffer text scan which
-    // works for uncompressed or lightly-compressed XML runs (not perfect but
-    // sufficient for template structure recognition).
-    try {
-      // @ts-ignore – jszip is an optional peer; fallback below handles missing case
-      const JSZip = (await import('jszip')).default;
-      const zip = await JSZip.loadAsync(buffer);
-      const slideFiles = Object.keys(zip.files).filter(
-        (name) => name.startsWith('ppt/slides/slide') && name.endsWith('.xml'),
-      );
-      const texts: string[] = [];
-      for (const name of slideFiles) {
-        const xml = await zip.files[name].async('text');
-        const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) ?? [];
-        for (const m of matches) {
-          const t = m.replace(/<[^>]+>/g, '').trim();
-          if (t) texts.push(t);
-        }
-      }
-      return texts.join('\n');
-    } catch {
-      // Fallback: scan raw buffer for XML text runs
-      const raw = buffer.toString('latin1');
-      const matches = raw.match(/<a:t[^>]*>([^<]{1,500})<\/a:t>/g) ?? [];
-      return matches.map((m) => m.replace(/<[^>]+>/g, '').trim()).filter(Boolean).join('\n');
+    case 'pptx': {
+      return extractPptxText(buffer);
     }
   }
-
-  throw new Error(`Unsupported file type: .${ext}`);
 }
+
+// PPTX is a ZIP of XML files. We use jszip when available; the fallback scans
+// the raw buffer for uncompressed XML text runs, which is sufficient for
+// template structure recognition on lightly-compressed slides.
+async function extractPptxText(buffer: Buffer): Promise<string> {
+  try {
+    // @ts-ignore - jszip is an optional peer not in package.json; fallback below
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(buffer);
+
+    const slideFiles = Object.keys(zip.files).filter(
+      (name) => name.startsWith('ppt/slides/slide') && name.endsWith('.xml'),
+    );
+
+    const texts: string[] = [];
+    for (const name of slideFiles) {
+      const xml = await zip.files[name].async('text') as string;
+      const matches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) ?? [];
+      for (const m of matches) {
+        const t = m.replace(/<[^>]+>/g, '').trim();
+        if (t) texts.push(t);
+      }
+    }
+    return texts.join('\n');
+  } catch {
+    // jszip not installed or ZIP parse failed: scan raw buffer for text runs.
+    // This covers uncompressed slides and is accurate enough for AI analysis.
+    const raw = buffer.toString('latin1');
+    const matches = raw.match(/<a:t[^>]*>([^<]{1,500})<\/a:t>/g) ?? [];
+    return matches
+      .map((m) => m.replace(/<[^>]+>/g, '').trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Route handler
+// ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
   const session = await getSession().catch(() => null);
@@ -105,16 +128,14 @@ export async function POST(req: NextRequest) {
   }
 
   const ext = (file.name ?? '').split('.').pop()?.toLowerCase() ?? '';
-  const supported = ['txt', 'pdf', 'docx', 'xlsx', 'pptx'];
-  if (!supported.includes(ext)) {
+  if (!isSupportedExt(ext)) {
     return NextResponse.json(
-      { error: `Unsupported file type .${ext}. Accepted: ${supported.join(', ')}` },
+      { error: `Unsupported file type .${ext}. Accepted: ${SUPPORTED_EXTENSIONS.join(', ')}` },
       { status: 415 },
     );
   }
 
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  const buffer = Buffer.from(await file.arrayBuffer());
 
   let rawText: string;
   try {
@@ -125,7 +146,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (rawText.length < 50) {
-    return NextResponse.json({ error: 'Could not extract meaningful text from the file' }, { status: 422 });
+    return NextResponse.json(
+      { error: 'Could not extract meaningful text from the file' },
+      { status: 422 },
+    );
   }
 
   try {
