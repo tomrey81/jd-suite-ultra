@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/get-session';
 import { callClaude, JD_SYSTEM_PROMPT } from '@/lib/ai';
 import { analyseInputRequestSchema } from '@jd-suite/types';
+import { JD_IMPORT_RULES } from '@/lib/ai/import-rules';
 
 export const maxDuration = 30;
 
@@ -25,8 +26,12 @@ export async function POST(req: Request) {
       JD_SYSTEM_PROMPT,
       `Analyse this job description input. Extract structured data for the following fields: ${fieldList}
 
+${JD_IMPORT_RULES}
+
 INPUT:
 ${text}
+
+Apply the import rules above when populating extractedFields. Use prescribed placeholder text for must-have fields that cannot be populated from source. Mark inferred content with [inferred — verify with line manager].
 
 Return JSON only (no markdown):
 {
