@@ -14,11 +14,12 @@ const PatchBody = z.object({
   vacancy: z.boolean().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const scope = await requireOrgScope();
   if (isScopeError(scope)) return scope;
 
-  const existing = await db.pmoaPosition.findFirst({ where: { id: params.id, orgId: scope.orgId } });
+  const existing = await db.pmoaPosition.findFirst({ where: { id, orgId: scope.orgId } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const parsed = PatchBody.safeParse(await req.json().catch(() => null));
@@ -35,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
   if (reportsToId) {
     // Prevent circular reference
-    if (reportsToId === params.id) {
+    if (reportsToId === id) {
       return NextResponse.json({ error: 'Position cannot report to itself' }, { status: 400 });
     }
     const parent = await db.pmoaPosition.findFirst({ where: { id: reportsToId, orgId: scope.orgId } });
@@ -43,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const position = await db.pmoaPosition.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       ...(name !== undefined && { name: name.trim() }),
       ...('positionNumber' in parsed.data && { positionNumber: positionNumber?.trim() || null }),
@@ -57,29 +58,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true, position });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const scope = await requireOrgScope();
   if (isScopeError(scope)) return scope;
 
-  const existing = await db.pmoaPosition.findFirst({ where: { id: params.id, orgId: scope.orgId } });
+  const existing = await db.pmoaPosition.findFirst({ where: { id, orgId: scope.orgId } });
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // Unlink children that reported to this position
   await db.pmoaPosition.updateMany({
-    where: { reportsToId: params.id, orgId: scope.orgId },
+    where: { reportsToId: id, orgId: scope.orgId },
     data: { reportsToId: null },
   });
 
   // Delete assignments for this position
-  await db.pmoaAssignment.deleteMany({ where: { positionId: params.id } });
+  await db.pmoaAssignment.deleteMany({ where: { positionId: id } });
 
   // Unlink dept heads
   await db.pmoaDepartment.updateMany({
-    where: { headPositionId: params.id, orgId: scope.orgId },
+    where: { headPositionId: id, orgId: scope.orgId },
     data: { headPositionId: null },
   });
 
-  await db.pmoaPosition.delete({ where: { id: params.id } });
+  await db.pmoaPosition.delete({ where: { id } });
 
   return NextResponse.json({ ok: true });
 }

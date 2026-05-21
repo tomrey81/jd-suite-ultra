@@ -16,3 +16,4 @@ export function newAuthTokenId(): string {
 }
 
 export const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 min
+export const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 min
