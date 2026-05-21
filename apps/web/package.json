@@ -40,7 +40,6 @@
     "docx": "^9.6.1",
     "exceljs": "^4.4.0",
     "html-to-image": "^1.11.13",
-    "jszip": "^3.10.1",
     "jspdf": "^2.5.2",
     "lucide-react": "^0.468.0",
     "mammoth": "^1.12.0",
