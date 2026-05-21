@@ -34,7 +34,7 @@ async function extractText(buffer: Buffer, ext: string): Promise<string> {
   if (ext === 'xlsx') {
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
+    await workbook.xlsx.load(buffer as any);
     const lines: string[] = [];
     workbook.eachSheet((sheet) => {
       lines.push(`[Sheet: ${sheet.name}]`);
