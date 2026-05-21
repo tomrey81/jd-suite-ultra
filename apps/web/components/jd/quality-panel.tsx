@@ -162,7 +162,7 @@ function ScoreCircle({ score, size = 'lg' }: { score: number; size?: 'sm' | 'lg'
 }
 
 export function QualityPanel() {
-  const { dqsScore, escoMatch, evalResult, evalLoading, fieldScores, templateSections, jd, setActiveSectionId } = useJDStore();
+  const { dqsScore, escoMatch, evalResult, evalLoading, evalError, fieldScores, templateSections, jd, setActiveSectionId } = useJDStore();
   const [tab, setTab] = useState<'verdict' | 'completeness'>('verdict');
   const [expandedAxis, setExpandedAxis] = useState<string | null>(null);
 
@@ -185,21 +185,52 @@ export function QualityPanel() {
   }, [axes]);
 
   const handleRunEval = async () => {
-    const { setEvalLoading, setEvalResult } = useJDStore.getState();
+    const { setEvalLoading, setEvalResult, setEvalError } = useJDStore.getState();
     setEvalLoading(true);
     setEvalResult(null);
+    setEvalError(null);
     try {
       const jdText = Object.entries(jd)
         .filter(([, v]) => v?.trim())
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
+      if (!jdText.trim()) {
+        setEvalError('Add at least a job title and one section before running the EUPTD check.');
+        return;
+      }
       const res = await fetch('/api/ai/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jdText }),
       });
-      if (res.ok) setEvalResult(await res.json());
-    } catch {/* silent */} finally {
+      if (!res.ok) {
+        let detail = `${res.status} ${res.statusText}`;
+        try {
+          const errBody = await res.json();
+          if (errBody?.error) detail = `${errBody.error} (${res.status})`;
+        } catch {/* response body not JSON, keep status */}
+        if (res.status === 401) {
+          setEvalError('Session expired. Sign in again, then re-run the check.');
+        } else if (res.status === 400) {
+          setEvalError(`Input rejected: ${detail}. Fill in the JD before running.`);
+        } else if (res.status === 429) {
+          setEvalError('Rate limit hit. Wait a minute and re-run.');
+        } else {
+          setEvalError(`Evaluation failed: ${detail}. Check server logs.`);
+        }
+        return;
+      }
+      const data = await res.json();
+      if (!data || !Array.isArray(data.criteria) || data.criteria.length === 0) {
+        setEvalError('The AI returned an empty or malformed response. Re-run the check.');
+        return;
+      }
+      setEvalResult(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setEvalError(`Network or parsing error: ${msg}. Re-run the check.`);
+      console.error('EUPTD evaluate failed:', err);
+    } finally {
       setEvalLoading(false);
     }
   };
@@ -239,10 +270,19 @@ export function QualityPanel() {
                 Tests this JD against the four EU Pay Transparency Directive 2023/970 axes:
                 <br /><strong>Skills</strong> · <strong>Effort</strong> · <strong>Responsibility</strong> · <strong>Working Conditions</strong>.
               </p>
+              {evalError && (
+                <div className="mt-2 w-full rounded-md border border-danger bg-danger-bg px-3 py-2 text-left text-[11px] leading-snug text-danger">
+                  <div className="mb-0.5 font-semibold">Check did not run</div>
+                  <div>{evalError}</div>
+                </div>
+              )}
               <button onClick={handleRunEval} disabled={!jd.jobTitle}
                 className="mt-2 rounded-md bg-brand-gold px-3 py-1.5 text-[11px] font-medium text-white disabled:opacity-40">
-                Run readiness check
+                {evalError ? 'Try again' : 'Run readiness check'}
               </button>
+              {!jd.jobTitle && (
+                <div className="text-[10px] italic text-text-muted">Add a job title to enable the check.</div>
+              )}
             </div>
           )}
 

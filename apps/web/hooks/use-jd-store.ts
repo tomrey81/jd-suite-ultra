@@ -26,6 +26,7 @@ interface JDStore {
   escoMatch: EscoMatch | null;
   evalResult: EvaluationResult | null;
   evalLoading: boolean;
+  evalError: string | null;
 
   // UI state
   showHighlights: boolean;
@@ -63,6 +64,7 @@ interface JDStore {
   setErsScore: (score: number | null) => void;
   setEvalResult: (result: EvaluationResult | null) => void;
   setEvalLoading: (loading: boolean) => void;
+  setEvalError: (error: string | null) => void;
   setShowHighlights: (show: boolean) => void;
   setAiLoadingField: (fieldId: string | null) => void;
   setSaving: (saving: boolean) => void;
@@ -96,6 +98,7 @@ const initialState = {
   escoMatch: null as EscoMatch | null,
   evalResult: null as EvaluationResult | null,
   evalLoading: false,
+  evalError: null as string | null,
   showHighlights: true,
   aiLoadingField: null as string | null,
   saving: false,
@@ -137,6 +140,7 @@ export const useJDStore = create<JDStore>((set, get) => ({
   setErsScore: (score) => set({ ersScore: score }),
   setEvalResult: (result) => set({ evalResult: result }),
   setEvalLoading: (loading) => set({ evalLoading: loading }),
+  setEvalError: (error) => set({ evalError: error }),
   setShowHighlights: (show) => set({ showHighlights: show }),
   setAiLoadingField: (fieldId) => set({ aiLoadingField: fieldId }),
   setSaving: (saving) => set({ saving }),
