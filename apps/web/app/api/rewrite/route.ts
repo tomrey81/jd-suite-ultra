@@ -47,11 +47,15 @@ export async function POST(req: NextRequest) {
       .join('\n');
 
     let parsed: { rewritten: string; changes: string[] } = { rewritten: '', changes: [] };
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try { parsed = JSON.parse(jsonMatch[0]); } catch { /* fall through */ }
+    // Strip markdown fences, then find the outermost JSON object
+    const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    // Find first { and last } to handle nested content
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try { parsed = JSON.parse(cleaned.slice(start, end + 1)); } catch { /* fall through */ }
     }
-    if (!parsed.rewritten) parsed = { rewritten: rawText.trim(), changes: [] };
+    if (!parsed.rewritten) parsed = { rewritten: cleaned, changes: [] };
 
     const afterLint = runLint(parsed.rewritten, fields);
 
