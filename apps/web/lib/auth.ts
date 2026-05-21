@@ -27,6 +27,8 @@ async function rateLimitKey(): Promise<string> {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     Credentials({
       name: 'credentials',
@@ -83,11 +85,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        // Fetch org membership for the token
-        const membership = await db.membership.findFirst({
-          where: { userId: user.id as string },
-          orderBy: { org: { createdAt: 'desc' } },
-        });
+        // Fetch org membership and platform admin flag
+        const [dbUser, membership] = await Promise.all([
+          db.user.findUnique({
+            where: { id: user.id as string },
+            select: { isPlatformAdmin: true },
+          }),
+          db.membership.findFirst({
+            where: { userId: user.id as string },
+            orderBy: { org: { createdAt: 'desc' } },
+          }),
+        ]);
+        if (dbUser?.isPlatformAdmin) token.isPlatformAdmin = true;
         if (membership) {
           token.orgId = membership.orgId;
           token.orgRole = membership.role;

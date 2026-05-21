@@ -6,6 +6,30 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && DATABASE_URL='postgresql://neondb_owner:npg_QV7yAskU9lPw@ep-shiny-hat-ag4zbdwj-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require' NEXTAUTH_SECRET=test-secret pnpm --filter web dev"],
       "port": 3000
+    },
+    {
+      "name": "jd-suite-ultra-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && cd /Users/tomaszrey/Desktop/Code/jd-suite-ultra && DATABASE_URL='postgresql://neondb_owner:npg_QV7yAskU9lPw@ep-shiny-hat-ag4zbdwj-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require' NEXTAUTH_SECRET=test-secret-ultra ENABLE_AXIOMERA_ENGINE=true ENABLE_AXIOMERA_SHADOW_MODE=true PORT=3800 pnpm --filter web dev -- --port 3800"],
+      "port": 3800
+    },
+    {
+      "name": "jd-suite-ultra-flags-off",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && cd /Users/tomaszrey/Desktop/Code/jd-suite-ultra && DATABASE_URL='postgresql://neondb_owner:npg_QV7yAskU9lPw@ep-shiny-hat-ag4zbdwj-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require' NEXTAUTH_SECRET=test-secret-ultra PORT=3801 pnpm --filter web dev -- --port 3801"],
+      "port": 3801
+    },
+    {
+      "name": "pelayo-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && cd /Users/tomaszrey/Downloads/app && npm install --legacy-peer-deps && npx vite --port 5173"],
+      "port": 5173
+    },
+    {
+      "name": "worktree-angry-matsumoto",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "source ~/.nvm/nvm.sh && cd /Users/tomaszrey/Desktop/Code/jd-suite-ultra/.claude/worktrees/angry-matsumoto && DATABASE_URL='postgresql://neondb_owner:npg_QV7yAskU9lPw@ep-shiny-hat-ag4zbdwj-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require' NEXTAUTH_SECRET=test-secret-ultra ENABLE_AXIOMERA_ENGINE=true ENABLE_INTAKE_CHECKLIST=true ENABLE_JD_PROJECT_READINESS=true ENABLE_PPTX_EXPORT=true PORT=3802 pnpm --filter web dev -- --port 3802"],
+      "port": 3802
     }
   ]
 }

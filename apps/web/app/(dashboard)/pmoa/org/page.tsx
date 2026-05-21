@@ -14,6 +14,7 @@ import {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { ExportMenu } from '@/components/export/export-menu';
+import type { ScrapedPage, CompanyIntel } from '@/lib/pmoa/web-scraper';
 
 interface PositionDTO {
   id: string;
@@ -75,6 +76,224 @@ function layoutTree(positions: PositionDTO[]): Map<string, { x: number; y: numbe
   return out;
 }
 
+// ── Web Intel Modal ──────────────────────────────────────────────────────────
+
+function WebIntelModal({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [intel, setIntel] = useState<CompanyIntel | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+
+  async function handleFetch() {
+    setFetching(true); setErr(null); setIntel(null); setSavedCount(null); setSelectedPages(new Set());
+    try {
+      const res = await fetch('/api/pmoa/fetch-web-intel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteUrl, companyName, isPublicCompany: isPublic }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error || 'Fetch failed'); return; }
+      setIntel(data.intel as CompanyIntel);
+      // Pre-select all pages
+      const all = new Set<string>();
+      for (const p of [...(data.intel.orgPages || []), ...(data.intel.irPages || []), ...(data.intel.newsPages || [])]) {
+        all.add(p.url);
+      }
+      setSelectedPages(all);
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!intel) return;
+    const allPages: ScrapedPage[] = [
+      ...(intel.orgPages || []),
+      ...(intel.irPages || []),
+      ...(intel.newsPages || []),
+    ].filter((p) => selectedPages.has(p.url));
+
+    if (allPages.length === 0) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/pmoa/save-web-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pages: allPages }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSavedCount(data.saved);
+        onSaved();
+      } else {
+        setErr(data.error || 'Save failed');
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function togglePage(url: string) {
+    setSelectedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url); else next.add(url);
+      return next;
+    });
+  }
+
+  const allPages: ScrapedPage[] = intel
+    ? [...(intel.orgPages || []), ...(intel.irPages || []), ...(intel.newsPages || [])]
+    : [];
+
+  const categoryLabel = (c: ScrapedPage['category']) =>
+    c === 'org' ? 'Org / Leadership' : c === 'ir' ? 'Investor Relations' : 'News / Press';
+
+  const categoryColor = (c: ScrapedPage['category']) =>
+    c === 'org' ? '#8A7560' : c === 'ir' ? '#3B6EA5' : '#2E6B37';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="relative flex w-full max-w-2xl flex-col gap-4 rounded-xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxHeight: '90vh', overflowY: 'auto' }}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="font-display text-base font-semibold text-text-primary">Fetch company web intelligence</h2>
+            <p className="mt-0.5 text-[11px] text-text-muted">
+              Scrapes leadership, investor relations, and news pages. Saved pages become PMOA documents for org building.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-lg text-text-muted">×</button>
+        </div>
+
+        {/* Inputs */}
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-text-muted">Company website URL</label>
+            <input
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://example.com"
+              className="w-full rounded border border-border-default bg-surface-page px-3 py-2 text-[13px] outline-none focus:border-brand-gold"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-text-muted">Company name (optional)</label>
+            <input
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="ACME Corp"
+              className="w-full rounded border border-border-default bg-surface-page px-3 py-2 text-[13px] outline-none focus:border-brand-gold"
+            />
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-[12px] text-text-primary">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="accent-brand-gold"
+            />
+            Publicly traded company — also check investor relations pages
+          </label>
+
+          <button
+            onClick={handleFetch}
+            disabled={fetching || !websiteUrl.trim()}
+            className="rounded-md bg-brand-gold px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+          >
+            {fetching ? 'Scraping…' : 'Fetch intelligence'}
+          </button>
+        </div>
+
+        {err && (
+          <div className="rounded border border-danger bg-danger-bg px-3 py-2 text-[11px] text-danger">{err}</div>
+        )}
+
+        {/* Results */}
+        {intel && allPages.length === 0 && (
+          <p className="text-[12px] text-text-muted">No pages found. The site may block scrapers, or the URL paths differ from common patterns.</p>
+        )}
+
+        {allPages.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+              {allPages.length} pages found — select which to save as PMOA documents
+            </div>
+
+            {(['org', 'ir', 'news'] as const).map((cat) => {
+              const catPages = allPages.filter((p) => p.category === cat);
+              if (catPages.length === 0) return null;
+              return (
+                <div key={cat}>
+                  <div
+                    className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ color: categoryColor(cat) }}
+                  >
+                    {categoryLabel(cat)}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {catPages.map((p) => (
+                      <label
+                        key={p.url}
+                        className="flex cursor-pointer items-start gap-2.5 rounded border border-border-default p-2.5 hover:bg-surface-page"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPages.has(p.url)}
+                          onChange={() => togglePage(p.url)}
+                          className="mt-0.5 accent-brand-gold"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[12px] font-medium text-text-primary">{p.title || p.url}</div>
+                          <div className="truncate text-[10px] text-text-muted">{p.url}</div>
+                          <div className="mt-1 text-[10px] text-text-muted line-clamp-2">
+                            {p.text.slice(0, 200)}…
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {savedCount === null ? (
+              <button
+                onClick={handleSave}
+                disabled={saving || selectedPages.size === 0}
+                className="rounded-md bg-text-primary px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : `Save ${selectedPages.size} page(s) as PMOA documents`}
+              </button>
+            ) : (
+              <div className="rounded border border-green-300 bg-green-50 px-3 py-2 text-[12px] text-green-700">
+                ✓ {savedCount} document(s) saved to PMOA. You can now run &quot;Re-build from documents&quot; to include this data.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ────────────────────────────────────────────────────────────────
+
 export default function PmoaOrgPage() {
   const [positions, setPositions] = useState<PositionDTO[]>([]);
   const [departments, setDepartments] = useState<DepartmentDTO[]>([]);
@@ -85,9 +304,12 @@ export default function PmoaOrgPage() {
   const [globalClarifications, setGlobalClarifications] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [clearing, setClearing] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [showWebIntel, setShowWebIntel] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Build a flat row set for tabular export (positions + holder + dept + acting/split state)
+  // Build a flat row set for tabular export
   const exportRows = useMemo(() => {
     const deptName = new Map(departments.map((d) => [d.id, d.name]));
     return positions.map((p) => {
@@ -137,6 +359,17 @@ export default function PmoaOrgPage() {
       }
     } finally {
       setBuilding(false);
+    }
+  }
+
+  async function clearOrg() {
+    setClearing(true); setConfirmClear(false);
+    try {
+      await fetch('/api/pmoa/clear-org', { method: 'DELETE' });
+      setPositions([]); setDepartments([]); setAssignments([]);
+      setSelectedId(null); setGlobalClarifications([]);
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -230,13 +463,25 @@ export default function PmoaOrgPage() {
         <div>
           <h1 className="font-display text-lg font-semibold text-text-primary">Org map</h1>
           <p className="text-[11px] text-text-muted">
-            {positions.length === 0 ? 'No positions yet — run "Build org from documents" once you\'ve tagged HRIS rosters / org charts.' :
-              `${positions.length} positions · ${departments.length} departments · ${assignments.length} assignments`}
+            {positions.length === 0
+              ? 'No positions yet — run "Build org from documents" once you\'ve tagged HRIS rosters / org charts.'
+              : `${positions.length} positions · ${departments.length} departments · ${assignments.length} assignments`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search positions…"
-            className="w-48 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-xs outline-none focus:border-brand-gold" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search positions…"
+            className="w-48 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-xs outline-none focus:border-brand-gold"
+          />
+          <button
+            onClick={() => setShowWebIntel(true)}
+            className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px] text-text-primary hover:bg-surface-page"
+            title="Fetch leadership, investor relations, and news from the company website"
+          >
+            ⊕ Fetch web intel
+          </button>
           <ExportMenu
             canvasRef={canvasRef}
             data={{
@@ -259,10 +504,41 @@ export default function PmoaOrgPage() {
             initialPageFormat="A3"
             initialOrientation="landscape"
           />
-          <button onClick={buildOrg} disabled={building}
-            className="rounded-md bg-brand-gold px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+          <button
+            onClick={buildOrg}
+            disabled={building}
+            className="rounded-md bg-brand-gold px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          >
             {building ? 'Building…' : positions.length === 0 ? '↻ Build org from documents' : '↻ Re-build from documents'}
           </button>
+          {positions.length > 0 && (
+            confirmClear ? (
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-danger">Clear all org data?</span>
+                <button
+                  onClick={clearOrg}
+                  disabled={clearing}
+                  className="rounded border border-danger px-2 py-1 text-[11px] text-danger hover:bg-danger-bg disabled:opacity-50"
+                >
+                  {clearing ? '…' : 'Yes, clear'}
+                </button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  className="rounded border border-border-default px-2 py-1 text-[11px] text-text-muted hover:bg-surface-page"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmClear(true)}
+                className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px] text-text-muted hover:border-danger hover:text-danger"
+                title="Remove all org structure data for this project"
+              >
+                ✕ Clear data
+              </button>
+            )
+          )}
           <Link href="/pmoa" className="rounded border border-border-default bg-white px-3 py-1.5 text-[11px] text-text-primary">
             ← PMOA
           </Link>
@@ -294,31 +570,53 @@ export default function PmoaOrgPage() {
                 <div className="mb-3 text-3xl opacity-30">⌬</div>
                 <div className="font-display text-lg text-text-primary">No org graph yet</div>
                 <p className="mt-2 text-[12px] leading-relaxed text-text-muted">
-                  Upload HR documents on the <Link href="/pmoa" className="text-brand-gold underline">PMOA dashboard</Link>,
-                  tag them as &quot;recent&quot; or &quot;partially valid&quot;, then click <strong>Build org from documents</strong>.
+                  Upload HR documents on the{' '}
+                  <Link href="/pmoa" className="text-brand-gold underline">PMOA dashboard</Link>,
+                  tag them as &quot;recent&quot; or &quot;partially valid&quot;, then click{' '}
+                  <strong>Build org from documents</strong>.
                   Claude extracts departments, positions, reporting lines, and acting/split assignments.
+                </p>
+                <p className="mt-3 text-[11px] text-text-muted">
+                  Tip: click{' '}
+                  <button
+                    onClick={() => setShowWebIntel(true)}
+                    className="text-brand-gold underline"
+                  >
+                    Fetch web intel
+                  </button>{' '}
+                  to auto-scrape leadership and news from the company website.
                 </p>
               </div>
             </div>
           ) : (
-            <ReactFlow nodes={nodes} edges={edges} onNodeClick={onNodeClick}
-              fitView fitViewOptions={{ padding: 0.2 }}
-              minZoom={0.2} maxZoom={2}
-              proOptions={{ hideAttribution: true }}>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodeClick={onNodeClick}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.2}
+              maxZoom={2}
+              proOptions={{ hideAttribution: true }}
+            >
               <Background color="#E5DBC8" gap={24} />
               <Controls position="bottom-right" />
-              <MiniMap position="top-right" pannable zoomable
+              <MiniMap
+                position="top-right"
+                pannable
+                zoomable
                 nodeColor={(n) => {
                   const p = positions.find((x) => x.id === n.id);
                   if (!p) return '#ddd';
                   if (p.vacancy) return '#FCD34D';
                   return '#8A7560';
-                }} />
+                }}
+              />
             </ReactFlow>
           )}
         </div>
 
-        {/* Side panel */}
+        {/* Position detail side panel */}
         {selected && (
           <aside className="w-[340px] shrink-0 overflow-y-auto border-l border-border-default bg-white p-4">
             <div className="flex items-start justify-between">
@@ -333,9 +631,19 @@ export default function PmoaOrgPage() {
             </div>
             <div className="mt-3 space-y-2 text-[12px]">
               <Row label="Department" value={selectedDept?.name || '—'} />
-              <Row label="Holder" value={selected.vacancy ? <em className="text-warning">vacant</em> : (selected.currentHolderName || '—')} />
+              <Row
+                label="Holder"
+                value={selected.vacancy
+                  ? <em className="text-warning">vacant</em>
+                  : (selected.currentHolderName || '—')}
+              />
               <Row label="Span of control" value={String(selected.spanOfControl)} />
-              <Row label="Linked JD" value={selected.linkedJdId ? <Link href={`/jd/${selected.linkedJdId}`} className="text-brand-gold underline">open →</Link> : <em className="text-text-muted">none</em>} />
+              <Row
+                label="Linked JD"
+                value={selected.linkedJdId
+                  ? <Link href={`/jd/${selected.linkedJdId}`} className="text-brand-gold underline">open →</Link>
+                  : <em className="text-text-muted">none</em>}
+              />
             </div>
             {selectedAssignments.length > 0 && (
               <div className="mt-4">
@@ -367,6 +675,14 @@ export default function PmoaOrgPage() {
           </aside>
         )}
       </div>
+
+      {/* Web Intel Modal */}
+      {showWebIntel && (
+        <WebIntelModal
+          onClose={() => setShowWebIntel(false)}
+          onSaved={() => {/* docs saved — user can now rebuild */}}
+        />
+      )}
     </div>
   );
 }

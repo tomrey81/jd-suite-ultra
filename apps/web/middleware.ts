@@ -27,30 +27,15 @@ function isAdminRoute(path: string) {
   return ADMIN_PREFIXES.some((p) => path.startsWith(p));
 }
 
-/**
- * Decode the JWT payload WITHOUT verifying the signature.
- * This is intentionally unverified — it is used only as a fast first-pass
- * check in Edge middleware (no Node crypto available). Route handlers MUST
- * still call auth() which performs the full HMAC verification.
- */
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(payload)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (isPublic(pathname)) return NextResponse.next();
 
-  // Session check: next-auth JWT cookie presence (not signature — Edge Runtime
-  // limitation). Route handlers call auth() for full verification.
+  // Session check: next-auth JWT cookie presence. NextAuth issues encrypted
+  // JWE tokens (5 parts) that cannot be decoded in Edge middleware without
+  // the secret. Authentication and admin checks are delegated to server-side
+  // auth() calls in layouts and route handlers.
   const sessionCookie =
     req.cookies.get('next-auth.session-token') ||
     req.cookies.get('__Secure-next-auth.session-token') ||
@@ -72,21 +57,9 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Admin route fast-check: decode JWT payload (unverified) and read
-  // isPlatformAdmin claim. A missing or false claim redirects to /forbidden.
-  // Route handlers still perform full auth() + DB verification.
-  if (isAdminRoute(pathname)) {
-    const payload = decodeJwtPayload(sessionCookie.value);
-    const isAdmin = payload?.isPlatformAdmin === true;
-    if (!isAdmin) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-      const url = req.nextUrl.clone();
-      url.pathname = '/forbidden';
-      return NextResponse.redirect(url);
-    }
-  }
+  // Admin routes: session cookie presence is confirmed above. The admin
+  // layout calls requireAdmin() which performs full auth() + DB verification
+  // of the isPlatformAdmin flag. No fast-check needed here.
 
   return NextResponse.next();
 }
