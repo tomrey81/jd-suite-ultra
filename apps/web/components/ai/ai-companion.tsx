@@ -6,11 +6,13 @@
  * Behaviour:
  * — Floating, draggable launcher (position persisted in localStorage)
  * — Three panel sizes: compact (380x520), expanded (480x680), fullscreen
+ * — Resizable panel via drag handle at bottom-right corner
  * — Keyboard shortcuts: Cmd/Ctrl+J open/close, Cmd/Ctrl+Shift+J fullscreen, Esc close, Cmd/Ctrl+Enter send
  * — Real backend: /api/ai/companion (multi-turn, context-aware)
  * — Voice input: Web Speech API; mic button transcribes into the message box
  * — Page context: pathname, selected JD (via useJDStore), locale
  * — Honest error states: NOT_CONFIGURED / AI_ERROR / network — never silent "No response received"
+ * — Mobile QR panel for opening on phone
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,6 +24,7 @@ import { cn } from '@/lib/utils';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  ts?: number; // unix ms
 }
 
 type Size = 'compact' | 'expanded' | 'fullscreen';
@@ -360,6 +363,14 @@ export function AICompanion() {
   const [errorState, setErrorState] = useState<{ message: string; code: string } | null>(null);
   const [mood, setMood] = useState<Mood>('idle');
 
+  // Resizable panel
+  const [panelSize, setPanelSize] = useState<{ w: number; h: number }>({ w: 420, h: 580 });
+  const resizing = useRef(false);
+  const resizeStart = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  // Mobile QR overlay
+  const [showMobileQR, setShowMobileQR] = useState(false);
+
   // Companion identity (read from settings localStorage on mount)
   const [companionName, setCompanionName] = useState('Krystyna');
   const [companionAvatar, setCompanionAvatar] = useState('default');
@@ -378,6 +389,11 @@ export function AICompanion() {
 
   // Saved exchanges (set of assistant message indices that have been saved)
   const [savedIndices, setSavedIndices] = useState<Set<number>>(new Set());
+
+  // File attachment
+  const [attachedFile, setAttachedFile] = useState<{ name: string; text: string } | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Voice
   const [recording, setRecording] = useState(false);
@@ -513,11 +529,11 @@ export function AICompanion() {
             const title = props?.title?.title?.[0]?.plain_text || props?.Name?.title?.[0]?.plain_text || 'Untitled';
             return `- ${title}`;
           }).join('\n')}`;
-      setMessages((prev) => [...prev, { role: 'assistant', content: summary }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: summary, ts: Date.now() }]);
       setNotionSearchQuery('');
       setNotionSearchOpen(false);
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `Notion search failed: ${err instanceof Error ? err.message : 'Network error'}` }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Notion search failed: ${err instanceof Error ? err.message : 'Network error'}`, ts: Date.now() }]);
     } finally {
       setNotionSearching(false);
     }
@@ -548,12 +564,12 @@ export function AICompanion() {
         }),
       });
       if (res.ok) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: `Conversation saved to Notion: "${title}"` }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: `Conversation saved to Notion: "${title}"`, ts: Date.now() }]);
       } else {
         throw new Error(`HTTP ${res.status}`);
       }
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `Failed to save to Notion: ${err instanceof Error ? err.message : 'Network error'}` }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Failed to save to Notion: ${err instanceof Error ? err.message : 'Network error'}`, ts: Date.now() }]);
     } finally {
       setSavingToNotion(false);
     }
@@ -611,19 +627,73 @@ export function AICompanion() {
       try { localStorage.setItem(STORAGE_LAUNCHER_POS, JSON.stringify(pos)); } catch { /* ignore */ }
     }
     dragOffset.current = null;
-    // If user didn't move, treat as click → open
+    // If user didn't move, treat as click -> open
     if (!dragMoved.current) setOpen(true);
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+  };
+
+  // Resize handlers
+  const onResizePointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizing.current = true;
+    resizeStart.current = { x: e.clientX, y: e.clientY, w: panelSize.w, h: panelSize.h };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onResizePointerMove = (e: React.PointerEvent) => {
+    if (!resizing.current || !resizeStart.current) return;
+    const dw = e.clientX - resizeStart.current.x;
+    const dh = e.clientY - resizeStart.current.y;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setPanelSize({
+      w: Math.min(Math.max(resizeStart.current.w + dw, 360), vw * 0.9),
+      h: Math.min(Math.max(resizeStart.current.h + dh, 480), vh * 0.9),
+    });
+  };
+
+  const onResizePointerUp = () => {
+    resizing.current = false;
+    resizeStart.current = null;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/ai/extract-text', { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErrorState({ message: data.error || 'Could not read file', code: 'FILE_ERROR' });
+        return;
+      }
+      setAttachedFile({ name: file.name, text: data.text });
+    } catch {
+      setErrorState({ message: 'File upload failed', code: 'FILE_ERROR' });
+    } finally {
+      setUploadingFile(false);
+      // reset input so same file can be re-attached
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   // Send message
   const send = useCallback(
     async (text?: string) => {
-      const msg = (text ?? input).trim();
+      const rawMsg = (text ?? input).trim();
+      const msg = attachedFile
+        ? `[Attached: ${attachedFile.name}]\n\n${attachedFile.text}\n\n${rawMsg || 'Please review this document.'}`
+        : rawMsg;
       if (!msg || loading) return;
+      // Clear the attached file after sending
+      setAttachedFile(null);
       setInput('');
       setErrorState(null);
-      const next = [...messages, { role: 'user' as const, content: msg }];
+      const next = [...messages, { role: 'user' as const, content: msg, ts: Date.now() }];
       setMessages(next);
       setLoading(true);
       try {
@@ -663,7 +733,30 @@ export function AICompanion() {
           });
           return;
         }
-        setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
+        setMessages((prev) => [...prev, { role: 'assistant', content: reply, ts: Date.now() }]);
+        // Auto-save to Notion if configured (fire-and-forget)
+        if (notionSettings) {
+          const userMsg = msg;
+          const assistantMsg = reply;
+          const autoTitle = `${companionName} — ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+          fetch(notionSettings.workerUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              method: 'POST',
+              path: 'pages',
+              token: notionSettings.token,
+              body: {
+                parent: { page_id: notionSettings.parentPageId },
+                properties: { title: { title: [{ type: 'text', text: { content: autoTitle } }] } },
+                children: [
+                  { object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: `USER: ${userMsg.slice(0, 1900)}` } }] } },
+                  { object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: `KRYSTYNA: ${assistantMsg.slice(0, 1900)}` } }] } },
+                ],
+              },
+            }),
+          }).catch(() => {}); // fire and forget — never block the UI
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Network error';
         setErrorState({ message, code: 'NETWORK' });
@@ -671,7 +764,7 @@ export function AICompanion() {
         setLoading(false);
       }
     },
-    [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore, companionLocale, companionName, jdList],
+    [input, loading, messages, pathname, jdId, jd, dqsScore, ersScore, companionLocale, companionName, jdList, attachedFile, notionSettings],
   );
 
   const saveExchange = useCallback(async (assistantIdx: number) => {
@@ -797,8 +890,8 @@ export function AICompanion() {
   }
 
   // Panel - anchored near launcher position, clamped to viewport
-  const panelW = size === 'expanded' ? 480 : 380;
-  const panelH = size === 'expanded' ? 680 : 520;
+  const panelW = panelSize.w;
+  const panelH = panelSize.h;
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
   const panelLeft = Math.min(Math.max(pos.x - panelW / 2, 8), vw - panelW - 8);
@@ -807,7 +900,7 @@ export function AICompanion() {
   const panelClass =
     size === 'fullscreen'
       ? 'fixed inset-2 z-[70] sm:inset-4'
-      : 'fixed z-[70] h-[70vh] w-[calc(100vw-24px)] max-h-[520px] sm:h-auto sm:w-auto';
+      : 'fixed z-[70]';
 
   const panelStyle = size === 'fullscreen'
     ? {}
@@ -818,24 +911,82 @@ export function AICompanion() {
         height: panelH,
       };
 
+  // Status dot color by mood
+  const moodDot =
+    mood === 'thinking' ? 'bg-amber-400'
+    : mood === 'error'   ? 'bg-red-500'
+    : mood === 'listening' ? 'bg-blue-400 animate-pulse'
+    : 'bg-emerald-400';
+
   return (
-    <div className={cn(panelClass, 'flex flex-col overflow-hidden rounded-xl border border-border-default bg-white shadow-2xl')} style={panelStyle}>
+    <div
+      className={cn(panelClass, 'flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl')}
+      style={panelStyle}
+    >
+      {/* Mobile QR overlay */}
+      {showMobileQR && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-white/95 backdrop-blur-sm rounded-xl">
+          <button
+            onClick={() => setShowMobileQR(false)}
+            className="absolute right-4 top-4 text-text-muted hover:text-text-primary text-sm"
+            aria-label="Close mobile panel"
+          >
+            ✕
+          </button>
+          <p className="text-sm font-semibold text-text-primary">Open on mobile</p>
+          <div className="rounded-xl border-2 border-brand-gold p-3">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                (typeof window !== 'undefined' ? window.location.origin : '') + '/mobile-companion'
+              )}`}
+              alt="QR code to open on mobile"
+              width={180}
+              height={180}
+              className="block"
+            />
+          </div>
+          <p className="max-w-[220px] text-center text-xs text-text-muted">
+            Scan to open {companionName} on your phone. Voice and text — transcripts saved automatically.
+          </p>
+          <a
+            href="/mobile-companion"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg bg-brand-gold px-4 py-2 text-xs font-medium text-white"
+          >
+            Open in new tab
+          </a>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="shrink-0 border-b border-border-default bg-surface-header px-4 py-3">
+      <div className="shrink-0 border-b border-gray-100 bg-surface-header px-4 py-3">
         <div className="flex items-center gap-3">
-          <CompanionAvatar avatarSetting={companionAvatar} mood={mood} size={32} />
+          <CompanionAvatar avatarSetting={companionAvatar} mood={mood} size={36} />
           <div className="min-w-0 flex-1">
-            <h3 className="font-display text-[13px] tracking-wide text-text-on-dark">{companionName}</h3>
-            <p className="truncate text-[9px] text-text-on-dark/40">
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-[14px] font-semibold tracking-wide text-text-on-dark leading-none">{companionName}</h3>
+              <span className={cn('h-2 w-2 rounded-full shrink-0', moodDot)} title={mood} />
+            </div>
+            <p className="mt-0.5 truncate text-[10px] text-text-on-dark/40">
               {pathname || 'JD Suite'}
               {jd?.jobTitle ? ` · ${jd.jobTitle}` : ''}
             </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            {/* Mobile QR toggle */}
+            <button
+              onClick={() => setShowMobileQR((o) => !o)}
+              className="rounded-md px-1.5 py-1.5 text-[12px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
+              title="Open on mobile"
+              aria-label="Open on mobile"
+            >
+              📱
+            </button>
             {size !== 'compact' && (
               <button
                 onClick={() => setSize('compact')}
-                className="rounded px-1.5 py-1 text-[10px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+                className="rounded-md px-1.5 py-1.5 text-[11px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
                 title="Compact"
               >
                 ▭
@@ -844,7 +995,7 @@ export function AICompanion() {
             {size !== 'expanded' && (
               <button
                 onClick={() => setSize('expanded')}
-                className="rounded px-1.5 py-1 text-[10px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+                className="rounded-md px-1.5 py-1.5 text-[11px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
                 title="Expanded"
               >
                 ◫
@@ -853,7 +1004,7 @@ export function AICompanion() {
             {size !== 'fullscreen' && (
               <button
                 onClick={() => setSize('fullscreen')}
-                className="rounded px-1.5 py-1 text-[10px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+                className="rounded-md px-1.5 py-1.5 text-[11px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
                 title="Fullscreen (Cmd+Shift+J)"
               >
                 ⛶
@@ -863,7 +1014,7 @@ export function AICompanion() {
               <>
                 <button
                   onClick={() => setNotionSearchOpen((o) => !o)}
-                  className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+                  className="rounded-md px-1.5 py-1.5 text-[11px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
                   title="Search Notion"
                 >
                   ⊞
@@ -871,7 +1022,7 @@ export function AICompanion() {
                 <button
                   onClick={saveToNotion}
                   disabled={savingToNotion || messages.length === 0}
-                  className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80 disabled:opacity-30"
+                  className="rounded-md px-1.5 py-1.5 text-[11px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 disabled:opacity-30 transition-colors"
                   title="Save to Notion"
                 >
                   {savingToNotion ? '…' : '↗'}
@@ -880,14 +1031,14 @@ export function AICompanion() {
             )}
             <button
               onClick={clearChat}
-              className="rounded px-1.5 py-1 text-[9px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+              className="rounded-md px-1.5 py-1.5 text-[10px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
               title="Clear conversation"
             >
               Clear
             </button>
             <button
               onClick={() => setOpen(false)}
-              className="rounded px-1.5 py-1 text-[10px] text-text-on-dark/40 hover:bg-white/10 hover:text-text-on-dark/80"
+              className="rounded-md px-1.5 py-1.5 text-[11px] text-text-on-dark/50 hover:bg-white/10 hover:text-text-on-dark/90 transition-colors"
               title="Close (Esc)"
             >
               ✕
@@ -898,20 +1049,20 @@ export function AICompanion() {
 
       {/* Notion search bar — slides in when open */}
       {notionSearchOpen && (
-        <div className="shrink-0 border-b border-border-default bg-surface-page px-3 py-2">
+        <div className="shrink-0 border-b border-gray-100 bg-gray-50 px-3 py-2">
           <div className="flex items-center gap-2">
             <input
               autoFocus
               value={notionSearchQuery}
               onChange={(e) => setNotionSearchQuery(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') searchNotion(); if (e.key === 'Escape') setNotionSearchOpen(false); }}
-              placeholder="Search Notion pages…"
-              className="flex-1 rounded-md border border-border-default bg-white px-2.5 py-1.5 text-[11px] text-text-primary outline-none focus:border-brand-gold"
+              placeholder="Search Notion pages..."
+              className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[12px] text-text-primary outline-none focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/20"
             />
             <button
               onClick={searchNotion}
               disabled={notionSearching || !notionSearchQuery.trim()}
-              className="rounded-md bg-brand-gold px-2.5 py-1.5 text-[10px] font-medium text-white disabled:opacity-40"
+              className="rounded-lg bg-brand-gold px-3 py-1.5 text-[11px] font-medium text-white disabled:opacity-40"
             >
               {notionSearching ? '…' : 'Search'}
             </button>
@@ -921,18 +1072,18 @@ export function AICompanion() {
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {messages.length === 0 && !loading && (
-          <div className="space-y-3">
-            <p className="text-xs text-text-muted">
+          <div className="space-y-4">
+            <p className="text-[13px] text-text-muted leading-relaxed">
               I&apos;m {companionName}. Ask me about this JD, the architecture matrix, your processes, or what you should do next.
             </p>
-            <div className={cn('grid gap-1.5', size === 'compact' ? 'grid-cols-1' : 'grid-cols-2')}>
+            <div className={cn('grid gap-2', size === 'compact' ? 'grid-cols-1' : 'grid-cols-2')}>
               {QUICK_ACTIONS.map((q) => (
                 <button
                   key={q}
                   onClick={() => send(q)}
-                  className="rounded-lg border border-border-default px-2.5 py-2 text-left text-[10px] text-text-secondary transition-colors hover:border-brand-gold/40 hover:bg-brand-gold-lighter"
+                  className="rounded-xl border border-gray-200 px-3 py-2.5 text-left text-[11px] text-text-secondary leading-snug transition-colors hover:border-brand-gold/50 hover:bg-[#F6F4EF]"
                 >
                   {q}
                 </button>
@@ -944,39 +1095,46 @@ export function AICompanion() {
           <div key={i} className={cn('group flex flex-col', m.role === 'user' ? 'items-end' : 'items-start')}>
             <div
               className={cn(
-                'max-w-[88%] whitespace-pre-wrap rounded-lg px-3 py-2 text-[12px] leading-relaxed',
+                'max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed',
                 m.role === 'user'
-                  ? 'bg-brand-gold/10 text-text-primary'
-                  : 'bg-surface-page text-text-secondary',
+                  ? 'bg-[#F5EFE6] text-text-primary rounded-br-sm'
+                  : 'bg-white border border-gray-100 text-text-secondary rounded-bl-sm shadow-sm',
               )}
             >
               {m.content}
             </div>
-            {m.role === 'assistant' && (
-              <button
-                onClick={() => saveExchange(i)}
-                disabled={savedIndices.has(i)}
-                className={cn(
-                  'mt-0.5 text-[9px] transition-colors',
-                  savedIndices.has(i)
-                    ? 'cursor-default text-success'
-                    : 'text-text-muted opacity-0 hover:text-brand-gold group-hover:opacity-100',
-                )}
-                title={savedIndices.has(i) ? 'Saved' : 'Save this exchange'}
-              >
-                {savedIndices.has(i) ? '✓ Saved' : '⊕ Save'}
-              </button>
-            )}
+            <div className="flex items-center gap-2 mt-0.5">
+              {m.ts && (
+                <span className="text-[9px] text-text-muted opacity-60">
+                  {new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              {m.role === 'assistant' && (
+                <button
+                  onClick={() => saveExchange(i)}
+                  disabled={savedIndices.has(i)}
+                  className={cn(
+                    'text-[9px] transition-colors',
+                    savedIndices.has(i)
+                      ? 'cursor-default text-success'
+                      : 'text-text-muted opacity-0 hover:text-brand-gold group-hover:opacity-100',
+                  )}
+                  title={savedIndices.has(i) ? 'Saved' : 'Save this exchange'}
+                >
+                  {savedIndices.has(i) ? '✓ Saved' : '⊕ Save'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {loading && (
-          <div className="flex items-center gap-2 text-[11px] text-text-muted">
-            <CompanionAvatar avatarSetting={companionAvatar} mood="thinking" size={20} />
-            <span>{companionName} is thinking…</span>
+          <div className="flex items-center gap-2.5 text-[12px] text-text-muted">
+            <CompanionAvatar avatarSetting={companionAvatar} mood="thinking" size={22} />
+            <span>{companionName} is thinking...</span>
           </div>
         )}
         {errorState && (
-          <div className="rounded-md border border-danger/30 bg-danger-bg p-2.5 text-[11px] text-danger">
+          <div className="rounded-xl border border-danger/30 bg-danger-bg p-3 text-[12px] text-danger">
             <div className="font-medium">
               {errorState.code === 'NOT_CONFIGURED' && 'AI Companion is not configured'}
               {errorState.code === 'UNAUTHORIZED' && `Sign in to use ${companionName}`}
@@ -985,7 +1143,7 @@ export function AICompanion() {
               {errorState.code === 'EMPTY' && 'Empty response'}
               {!['NOT_CONFIGURED', 'UNAUTHORIZED', 'AI_ERROR', 'NETWORK', 'EMPTY'].includes(errorState.code) && 'Error'}
             </div>
-            <div className="mt-0.5 opacity-90">{errorState.message}</div>
+            <div className="mt-0.5 opacity-90 text-[11px]">{errorState.message}</div>
             {errorState.code !== 'NOT_CONFIGURED' && (
               <button
                 onClick={() => {
@@ -995,7 +1153,7 @@ export function AICompanion() {
                     send(last.content);
                   }
                 }}
-                className="mt-2 rounded border border-danger/40 bg-white px-2 py-0.5 text-[10px] font-medium text-danger hover:bg-danger/5"
+                className="mt-2 rounded-lg border border-danger/40 bg-white px-3 py-1 text-[10px] font-medium text-danger hover:bg-danger/5"
               >
                 Retry
               </button>
@@ -1005,45 +1163,89 @@ export function AICompanion() {
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-border-default p-3">
-        <div className="flex items-end gap-2 rounded-lg border border-border-default bg-surface-page px-3 py-2">
+      <div className="shrink-0 border-t border-gray-100 p-3">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.docx,.txt"
+          className="hidden"
+          onChange={handleFileUpload}
+        />
+        {attachedFile && (
+          <div className="mb-2 flex items-center gap-1.5 rounded-lg border border-brand-gold/30 bg-brand-gold/5 px-3 py-1.5">
+            <span className="text-[11px] text-brand-gold truncate max-w-[200px]">{attachedFile.name}</span>
+            <button
+              onClick={() => setAttachedFile(null)}
+              className="ml-auto text-[9px] text-text-muted hover:text-danger"
+              aria-label="Remove attachment"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        <div className="rounded-xl border border-gray-200 bg-gray-50">
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={recording ? 'Listening…' : `Ask ${companionName}…  (Cmd+Enter to send)`}
-            rows={size === 'compact' ? 1 : 2}
-            className="flex-1 resize-none bg-transparent text-xs text-text-primary outline-none placeholder:text-text-muted"
+            placeholder={recording ? 'Listening...' : `Ask ${companionName}... she's seen worse.`}
+            rows={2}
+            className="w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[13px] text-text-primary outline-none placeholder:text-text-muted/60"
           />
-          <button
-            type="button"
-            onClick={recording ? stopVoice : startVoice}
-            disabled={loading}
-            className={cn(
-              'shrink-0 rounded-md px-2 py-1.5 text-[10px] font-medium transition-colors',
-              recording
-                ? 'bg-danger text-white motion-safe:animate-pulse'
-                : 'border border-border-default bg-white text-text-secondary hover:border-brand-gold hover:text-brand-gold',
-            )}
-            title={recording ? 'Stop recording' : 'Voice input'}
-            aria-label={recording ? 'Stop voice input' : 'Start voice input'}
-          >
-            {recording ? '■' : '🎙'}
-          </button>
-          <button
-            onClick={() => send()}
-            disabled={!input.trim() || loading}
-            className="shrink-0 rounded-md bg-brand-gold px-3 py-1.5 text-[10px] font-medium text-white transition-opacity disabled:opacity-30"
-          >
-            Send
-          </button>
+          <div className="flex items-center gap-1.5 px-3 pb-2 pt-1">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || uploadingFile}
+              className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-[12px] text-text-secondary transition-colors hover:border-brand-gold/50 hover:text-brand-gold disabled:opacity-40"
+              title="Attach a JD file (.pdf, .docx, .txt)"
+              aria-label="Attach file"
+            >
+              {uploadingFile ? '…' : '📎'}
+            </button>
+            <button
+              type="button"
+              onClick={recording ? stopVoice : startVoice}
+              disabled={loading}
+              className={cn(
+                'flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium transition-colors',
+                recording
+                  ? 'bg-danger text-white motion-safe:animate-pulse'
+                  : 'border border-gray-200 bg-white text-text-secondary hover:border-brand-gold/50 hover:text-brand-gold',
+              )}
+              title={recording ? 'Stop recording' : 'Voice input'}
+              aria-label={recording ? 'Stop voice input' : 'Start voice input'}
+            >
+              <span>{recording ? '■' : '🎙'}</span>
+              <span>{recording ? 'Stop' : 'Voice'}</span>
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={() => send()}
+              disabled={!input.trim() || loading}
+              className="rounded-lg bg-brand-gold px-4 py-1.5 text-[11px] font-medium text-white transition-opacity disabled:opacity-30 hover:opacity-90"
+            >
+              Send
+            </button>
+          </div>
         </div>
-        <div className="mt-1.5 flex items-center justify-between text-[9px] text-text-muted">
-          <span>Cmd/Ctrl+J · Cmd/Ctrl+Shift+J fullscreen · Esc close</span>
-          <span>{companionName} proposes — humans decide.</span>
-        </div>
+        <p className="mt-1.5 text-[9px] text-text-muted opacity-60">
+          Cmd+J toggle · Cmd+Shift+J fullscreen · Esc close · {companionName} proposes — humans decide.
+        </p>
       </div>
+
+      {/* Resize handle */}
+      {size !== 'fullscreen' && (
+        <div
+          className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize opacity-30 hover:opacity-70 transition-opacity"
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+          title="Drag to resize"
+          style={{ background: 'linear-gradient(135deg, transparent 50%, #8A7560 50%)' }}
+        />
+      )}
     </div>
   );
 }
