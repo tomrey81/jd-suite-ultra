@@ -54,11 +54,11 @@ export async function POST(req: NextRequest) {
 
     try {
       if (mime === 'application/pdf' || /\.pdf$/i.test(name)) {
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: new Uint8Array(buf) });
-        const r = await parser.getText();
-        rawText = (r as { text?: string }).text ?? '';
-        pages = (r as { numpages?: number }).numpages ?? null;
+        const mod: any = await import('pdf-parse');
+        const pdfParse = mod.default ?? mod;
+        const r = await pdfParse(buf);
+        rawText = (r.text as string) ?? '';
+        pages = (r.numpages as number) ?? null;
       } else if (
         mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
         /\.docx$/i.test(name)
