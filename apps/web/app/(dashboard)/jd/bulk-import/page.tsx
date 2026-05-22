@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
 interface Result {
@@ -12,6 +12,15 @@ interface Result {
   error?: string;
 }
 
+interface TemplateOption {
+  id: string;
+  name: string;
+  purpose?: string | null;
+  description?: string | null;
+  isDefault?: boolean;
+  orgId?: string | null;
+}
+
 export default function BulkImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -20,6 +29,29 @@ export default function BulkImportPage() {
   const [results, setResults] = useState<Result[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<{ imported: number; failed: number } | null>(null);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [templateId, setTemplateId] = useState<string>('none');
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/templates');
+        if (!res.ok) return;
+        const data = (await res.json()) as TemplateOption[];
+        if (cancelled) return;
+        setTemplates(data);
+        const def = data.find((t) => t.isDefault);
+        if (def) setTemplateId(def.id);
+      } catch {
+        // non-fatal — picker just stays empty
+      } finally {
+        if (!cancelled) setTemplatesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function pick(list: FileList | null) {
     if (!list) return;
@@ -46,6 +78,7 @@ export default function BulkImportPage() {
       const fd = new FormData();
       for (const f of files) fd.append('files', f);
       fd.append('folder', folder);
+      fd.append('templateId', templateId);
       const res = await fetch('/api/jd/bulk-import', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) {
@@ -99,17 +132,46 @@ export default function BulkImportPage() {
               className="hidden" />
           </div>
 
-          <div className="mt-4 flex items-end gap-3">
-            <label className="flex flex-1 flex-col gap-1">
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label className="flex flex-col gap-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Target folder</span>
               <input value={folder} onChange={(e) => setFolder(e.target.value)}
                 className="rounded border border-border-default bg-white px-2 py-1.5 text-[12px] outline-none focus:border-brand-gold" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                Template {templatesLoading && <span className="ml-1 text-text-muted">(loading…)</span>}
+              </span>
+              <select
+                value={templateId}
+                onChange={(e) => setTemplateId(e.target.value)}
+                disabled={templatesLoading}
+                className="rounded border border-border-default bg-white px-2 py-1.5 text-[12px] outline-none focus:border-brand-gold disabled:opacity-50"
+              >
+                <option value="none">No template (raw fields only)</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {t.isDefault ? ' · default' : ''}
+                    {t.orgId === null ? ' · system' : ''}
+                  </option>
+                ))}
+              </select>
             </label>
             <button onClick={upload} disabled={uploading || files.length === 0}
               className="rounded-md bg-brand-gold px-4 py-2 text-[12px] font-medium text-white disabled:opacity-40">
               {uploading ? 'Importing…' : `Import ${files.length} file${files.length !== 1 ? 's' : ''}`}
             </button>
           </div>
+          {templateId !== 'none' && templates.length > 0 && (
+            <p className="mt-2 text-[11px] text-text-muted">
+              Each imported JD will be linked to{' '}
+              <span className="font-medium text-text-primary">
+                {templates.find((t) => t.id === templateId)?.name || 'this template'}
+              </span>{' '}
+              so the editor opens with the right sections and fields.
+            </p>
+          )}
         </div>
 
         {/* Pending file list */}

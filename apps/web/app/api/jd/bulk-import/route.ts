@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { db } from '@jd-suite/db';
 import { auth } from '@/lib/auth';
 import { callAi, extractJson } from '@/lib/ai/call-ai';
+import { extractPdfText } from '@/lib/pdf/extract-text';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -150,10 +151,23 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const files = form.getAll('files') as File[];
   const folder = (form.get('folder') as string) || 'Imported';
+  const templateIdRaw = (form.get('templateId') as string) || '';
+  const templateId = templateIdRaw && templateIdRaw !== 'none' ? templateIdRaw : null;
 
   if (!files.length) return NextResponse.json({ error: 'No files' }, { status: 400 });
   if (files.length > MAX_FILES) {
     return NextResponse.json({ error: `Too many files (max ${MAX_FILES} per batch).` }, { status: 400 });
+  }
+
+  // Validate template is accessible to this org (or system-wide)
+  if (templateId) {
+    const tpl = await db.template.findFirst({
+      where: { id: templateId, OR: [{ orgId }, { orgId: null }] },
+      select: { id: true },
+    });
+    if (!tpl) {
+      return NextResponse.json({ error: 'Selected template not found or not accessible.' }, { status: 400 });
+    }
   }
 
   const results: ImportedJD[] = [];
@@ -172,11 +186,9 @@ export async function POST(req: NextRequest) {
     let rawText = '';
     try {
       if (mime === 'application/pdf' || /\.pdf$/i.test(name)) {
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: new Uint8Array(buf) });
-        const r = await parser.getText();
-        rawText = (r as { text?: string }).text ?? '';
-        await parser.destroy();
+        // Use pdfjs-dist legacy build directly — pdf-parse@2 pulls in the
+        // modern pdfjs build which crashes on Vercel (DOMMatrix not defined).
+        rawText = await extractPdfText(buf);
       } else if (
         mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
         /\.docx$/i.test(name)
@@ -237,6 +249,7 @@ export async function POST(req: NextRequest) {
             data,
             folder,
             status: 'DRAFT',
+            templateId: templateId || undefined,
           },
         });
         await tx.jDVersion.create({
