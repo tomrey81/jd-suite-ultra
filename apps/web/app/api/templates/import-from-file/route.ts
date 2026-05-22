@@ -5,8 +5,10 @@ import {
   TEMPLATE_IMPORT_SYSTEM_PROMPT,
   buildTemplateImportPrompt,
 } from '@/lib/ai/template-import-prompt';
+import { extractPdfText } from '@/lib/pdf/extract-text';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -30,11 +32,8 @@ async function extractText(buffer: Buffer, ext: SupportedExt): Promise<string> {
     }
 
     case 'pdf': {
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: buffer });
-      const result = await parser.getText();
-      await parser.destroy();
-      return (result.text as string) ?? '';
+      // pdfjs-dist legacy build avoids the DOMMatrix crash on Vercel serverless
+      return extractPdfText(buffer);
     }
 
     case 'docx': {

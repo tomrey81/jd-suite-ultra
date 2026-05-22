@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/get-session';
+import { extractPdfText } from '@/lib/pdf/extract-text';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 const MAX_BYTES = 500 * 1024; // 500 KB
 const MAX_CHARS = 12000;
@@ -36,20 +38,8 @@ export async function POST(req: NextRequest) {
   if (ext === 'txt') {
     raw = buffer.toString('utf-8');
   } else if (ext === 'pdf') {
-    let pdfParse: (buf: Buffer) => Promise<{ text: string }>;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mod: any = await import('pdf-parse');
-      pdfParse = mod.default ?? mod;
-    } catch {
-      return NextResponse.json(
-        { error: 'pdf-parse module could not be loaded' },
-        { status: 500 },
-      );
-    }
-    try {
-      const result = await pdfParse(buffer);
-      raw = result.text;
+      raw = await extractPdfText(buffer);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return NextResponse.json(

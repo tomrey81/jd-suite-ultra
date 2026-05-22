@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { callClaudeForExtraction, parseExtractionJSON, type ClaudeMessage } from '@/lib/process-extract';
+import { extractPdfText } from '@/lib/pdf/extract-text';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const SUPPORTED_TEXT_MIME = new Set([
@@ -46,11 +48,8 @@ export async function POST(req: NextRequest) {
           ],
         };
       } else if (mime === 'application/pdf' || /\.pdf$/i.test(name)) {
-        // pdf-parse v2 has a class-based API
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: new Uint8Array(buf) });
-        const result = await parser.getText();
-        const text = (result as { text?: string }).text ?? '';
+        // pdfjs-dist legacy build (Node-compatible, no DOMMatrix dependency)
+        const text = await extractPdfText(buf);
         if (!text || text.trim().length < 20) {
           return NextResponse.json({ error: 'PDF appears to be image-only or empty. Re-upload as PNG/JPG.' }, { status: 400 });
         }

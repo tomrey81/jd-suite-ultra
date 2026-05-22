@@ -6,6 +6,7 @@ import { callAi, extractJson } from '@/lib/ai/call-ai';
 import { extractPdfText } from '@/lib/pdf/extract-text';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 const MAX_PER_FILE_BYTES = 10 * 1024 * 1024;
